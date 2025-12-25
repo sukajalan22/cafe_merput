@@ -122,32 +122,32 @@ Implementasi backend API dengan Next.js API Routes dan MySQL database menggunaka
     - getSummary, getRevenueExpense, getCategorySales
     - _Requirements: 9.4, 9.5, 9.6_
 
-- [-] 6. Checkpoint - Ensure all queries work
+- [x] 6. Checkpoint - Ensure all queries work
   - Test semua query functions dengan database
   - Verify prepared statements digunakan
 
-- [ ] 7. Implement Roles API routes
-  - [ ] 7.1 Create roles list/create endpoint
+- [x] 7. Implement Roles API routes
+  - [x] 7.1 Create roles list/create endpoint
     - Create app/api/roles/route.ts
     - GET handler untuk list all roles
     - POST handler untuk create role
     - _Requirements: 5.3_
-  - [ ] 7.2 Create roles detail endpoint
+  - [x] 7.2 Create roles detail endpoint
     - Create app/api/roles/[id]/route.ts
     - GET, PUT, DELETE handlers
     - _Requirements: 5.3_
 
-- [ ] 8. Implement Auth API routes
-  - [ ] 8.1 Create login endpoint
+- [x] 8. Implement Auth API routes
+  - [x] 8.1 Create login endpoint
     - Create app/api/auth/login/route.ts
     - POST handler dengan email/password validation
     - Return JWT token dan user data
     - _Requirements: 2.1, 2.2_
-  - [ ] 8.2 Create logout endpoint
+  - [x] 8.2 Create logout endpoint
     - Create app/api/auth/logout/route.ts
     - POST handler untuk logout
     - _Requirements: 2.3_
-  - [ ] 8.3 Create me endpoint
+  - [x] 8.3 Create me endpoint
     - Create app/api/auth/me/route.ts
     - GET handler dengan auth middleware
     - Return current user data
@@ -156,7 +156,7 @@ Implementasi backend API dengan Next.js API Routes dan MySQL database menggunaka
     - **Property 8: Authentication Round Trip**
     - **Validates: Requirements 2.1, 2.4**
 
-- [ ] 9. Implement Products API routes
+- [-] 9. Implement Products API routes
   - [ ] 9.1 Create products list/create endpoint
     - Create app/api/products/route.ts
     - GET handler dengan search dan jenis_produk filter
