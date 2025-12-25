@@ -7,6 +7,7 @@ export interface User {
   user_id: string;
   username: string;
   email: string;
+  phone: string | null;
   role_id: string;
   status: 'Aktif' | 'Nonaktif';
   created_at: Date;
@@ -32,6 +33,7 @@ export interface CreateUserDTO {
   username: string;
   password: string;
   email: string;
+  phone?: string;
   role_id: string;
   status?: 'Aktif' | 'Nonaktif';
 }
@@ -40,6 +42,7 @@ export interface UpdateUserDTO {
   username?: string;
   password?: string;
   email?: string;
+  phone?: string;
   role_id?: string;
   status?: 'Aktif' | 'Nonaktif';
 }
@@ -49,7 +52,7 @@ export interface UpdateUserDTO {
  */
 export async function getAll(search?: string): Promise<UserWithRole[]> {
   let sql = `
-    SELECT u.user_id, u.username, u.email, u.role_id, u.status, u.created_at, u.updated_at, r.nama_role
+    SELECT u.user_id, u.username, u.email, u.phone, u.role_id, u.status, u.created_at, u.updated_at, r.nama_role
     FROM users u
     JOIN roles r ON u.role_id = r.role_id
   `;
@@ -71,7 +74,7 @@ export async function getAll(search?: string): Promise<UserWithRole[]> {
  */
 export async function getById(id: string): Promise<UserWithRole | null> {
   const sql = `
-    SELECT u.user_id, u.username, u.email, u.role_id, u.status, u.created_at, u.updated_at, r.nama_role
+    SELECT u.user_id, u.username, u.email, u.phone, u.role_id, u.status, u.created_at, u.updated_at, r.nama_role
     FROM users u
     JOIN roles r ON u.role_id = r.role_id
     WHERE u.user_id = ?
@@ -95,14 +98,15 @@ export async function getByEmail(email: string): Promise<UserWithPassword | null
 export async function create(data: CreateUserDTO): Promise<UserWithRole> {
   const id = uuidv4();
   const sql = `
-    INSERT INTO users (user_id, username, password, email, role_id, status)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO users (user_id, username, password, email, phone, role_id, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
   await execute(sql, [
     id,
     data.username,
     data.password,
     data.email,
+    data.phone || null,
     data.role_id,
     data.status || 'Aktif'
   ]);
@@ -137,6 +141,10 @@ export async function update(id: string, data: UpdateUserDTO): Promise<UserWithR
   if (data.email !== undefined) {
     updates.push('email = ?');
     params.push(data.email);
+  }
+  if (data.phone !== undefined) {
+    updates.push('phone = ?');
+    params.push(data.phone || null);
   }
   if (data.role_id !== undefined) {
     updates.push('role_id = ?');

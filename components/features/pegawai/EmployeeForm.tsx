@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { User, UserRole, UserStatus } from '@/lib/types';
+import { Role } from '@/lib/services/employees';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -11,13 +12,20 @@ interface EmployeeFormProps {
   onClose: () => void;
   onSubmit: (data: Omit<User, 'id' | 'createdAt'>) => void;
   employee?: User | null;
+  roles?: Role[];
 }
 
-const roles: UserRole[] = ['Kasir', 'Barista', 'Manager'];
+const defaultRoles: UserRole[] = ['Kasir', 'Barista', 'Manager'];
 const statuses: UserStatus[] = ['Aktif', 'Nonaktif'];
 
-export function EmployeeForm({ isOpen, onClose, onSubmit, employee }: EmployeeFormProps) {
+export function EmployeeForm({ isOpen, onClose, onSubmit, employee, roles = [] }: EmployeeFormProps) {
   const isEditing = !!employee;
+  
+  // Use roles from props if available, otherwise use default
+  // Filter out 'Admin' role - it should not be assignable via form
+  const availableRoles = roles.length > 0 
+    ? roles.filter(r => r.nama_role !== 'Admin').map(r => r.nama_role) 
+    : defaultRoles;
   
   // Use key to reset form state when employee changes
   const formKey = useMemo(() => employee?.id || 'new', [employee?.id]);
@@ -25,7 +33,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee }: EmployeeFo
   const [name, setName] = useState(employee?.name || '');
   const [email, setEmail] = useState(employee?.email || '');
   const [phone, setPhone] = useState(employee?.phone || '');
-  const [role, setRole] = useState<UserRole>(employee?.role || 'Kasir');
+  const [role, setRole] = useState<string>(employee?.role || availableRoles[0] || 'Kasir');
   const [status, setStatus] = useState<UserStatus>(employee?.status || 'Aktif');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -35,7 +43,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee }: EmployeeFo
     setName(employee?.name || '');
     setEmail(employee?.email || '');
     setPhone(employee?.phone || '');
-    setRole(employee?.role || 'Kasir');
+    setRole(employee?.role || availableRoles[0] || 'Kasir');
     setStatus(employee?.status || 'Aktif');
     setPassword('');
     setErrors({});
@@ -98,7 +106,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee }: EmployeeFo
       name: name.trim(),
       email: email.trim().toLowerCase(),
       phone: phone.trim(),
-      role,
+      role: role as UserRole,
       status,
     };
 
@@ -152,10 +160,10 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, employee }: EmployeeFo
           </label>
           <select
             value={role}
-            onChange={(e) => setRole(e.target.value as UserRole)}
+            onChange={(e) => setRole(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
           >
-            {roles.map((r) => (
+            {availableRoles.map((r) => (
               <option key={r} value={r}>
                 {r}
               </option>

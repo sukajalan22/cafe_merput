@@ -31,9 +31,9 @@ const users = [
     status: 'Aktif' as const,
   },
   {
-    username: 'Manager User',
-    email: 'manager@cafemerahputih.com',
-    password: 'manager123',
+    username: 'Manajer User',
+    email: 'manajer@cafemerahputih.com',
+    password: 'manajer123',
     role: 'Manager',
     status: 'Aktif' as const,
   },
@@ -421,7 +421,7 @@ async function seedSampleMaterialOrders(
 ): Promise<void> {
   console.log('Seeding sample material orders...');
   
-  const managerId = userMap.get('manager@cafemerahputih.com');
+  const managerId = userMap.get('manajer@cafemerahputih.com');
   if (!managerId) {
     console.error('Manager user not found, skipping material orders.');
     return;
@@ -498,9 +498,10 @@ async function seed(): Promise<void> {
     
     console.log('\nDefault users created:');
     console.log('  - admin@cafemerahputih.com / admin123 (Admin)');
-    console.log('  - manager@cafemerahputih.com / manager123 (Manager)');
+    console.log('  - manajer@cafemerahputih.com / manajer123 (Manager)');
     console.log('  - kasir@cafemerahputih.com / kasir123 (Kasir)');
     console.log('  - barista@cafemerahputih.com / barista123 (Barista)');
+    console.log('  - pengadaan@cafemerahputih.com / pengadaan123 (Pengadaan)');
     console.log('  - pengadaan@cafemerahputih.com / pengadaan123 (Pengadaan)');
     
   } catch (error) {

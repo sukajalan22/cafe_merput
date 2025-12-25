@@ -8,6 +8,8 @@ import {
   createEmployee,
   updateEmployee,
   deleteEmployee,
+  getRoles,
+  Role,
 } from '@/lib/services/employees';
 import { EmployeeCard } from '@/components/features/pegawai/EmployeeCard';
 import { EmployeeForm } from '@/components/features/pegawai/EmployeeForm';
@@ -18,6 +20,7 @@ import { Plus, Users } from 'lucide-react';
 
 export default function PegawaiPage() {
   const [employees, setEmployees] = useState<User[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<User | null>(null);
@@ -26,19 +29,24 @@ export default function PegawaiPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchEmployees() {
+    async function fetchData() {
       try {
         setIsLoading(true);
-        const data = await getEmployees();
-        setEmployees(data);
+        const [employeesData, rolesData] = await Promise.all([
+          getEmployees(),
+          getRoles(),
+        ]);
+        setEmployees(employeesData);
+        setRoles(rolesData);
       } catch (error) {
-        console.error('Failed to fetch employees:', error);
+        console.error('Failed to fetch data:', error);
         setEmployees([]);
+        setRoles([]);
       } finally {
         setIsLoading(false);
       }
     }
-    fetchEmployees();
+    fetchData();
   }, []);
 
   // Filter employees based on search
@@ -60,27 +68,33 @@ export default function PegawaiPage() {
     setDeleteConfirm(employeeId);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (deleteConfirm) {
-      const success = deleteEmployee(deleteConfirm);
+      const success = await deleteEmployee(deleteConfirm);
       if (success) {
-        setEmployees(getEmployees());
+        const updatedEmployees = await getEmployees();
+        setEmployees(updatedEmployees);
       }
       setDeleteConfirm(null);
     }
   };
 
-  const handleFormSubmit = (data: Omit<User, 'id' | 'createdAt'>) => {
+  const handleFormSubmit = async (data: Omit<User, 'id' | 'createdAt'>) => {
     setError(null);
     try {
       if (editingEmployee) {
         // Update existing employee
-        updateEmployee(editingEmployee.id, data);
+        await updateEmployee(editingEmployee.id, data);
       } else {
-        // Create new employee
-        createEmployee(data);
+        // Create new employee - ensure password is provided
+        if (!data.password) {
+          setError('Password wajib diisi');
+          return;
+        }
+        await createEmployee(data as Omit<User, 'id' | 'createdAt'> & { password: string });
       }
-      setEmployees(getEmployees());
+      const updatedEmployees = await getEmployees();
+      setEmployees(updatedEmployees);
       setIsFormOpen(false);
       setEditingEmployee(null);
     } catch (err) {
@@ -170,6 +184,7 @@ export default function PegawaiPage() {
         onClose={handleCloseForm}
         onSubmit={handleFormSubmit}
         employee={editingEmployee}
+        roles={roles}
       />
 
       {/* Delete Confirmation Modal */}

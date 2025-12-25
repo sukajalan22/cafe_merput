@@ -4,6 +4,12 @@
 import { User, UserRole, UserStatus } from '../types';
 import { getAuthToken } from './auth';
 
+// Role type from API
+export interface Role {
+  role_id: string;
+  nama_role: string;
+}
+
 // Helper to get auth headers
 function getHeaders(): HeadersInit {
   const headers: HeadersInit = {
@@ -14,6 +20,28 @@ function getHeaders(): HeadersInit {
     headers['Authorization'] = `Bearer ${token}`;
   }
   return headers;
+}
+
+// Get all roles from API
+export async function getRoles(): Promise<Role[]> {
+  try {
+    const response = await fetch('/api/roles', {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok || !data.success) {
+      console.error('Failed to fetch roles:', data.error);
+      return [];
+    }
+
+    return data.data;
+  } catch (error) {
+    console.error('Error fetching roles:', error);
+    return [];
+  }
 }
 
 // Map API role name to UserRole
