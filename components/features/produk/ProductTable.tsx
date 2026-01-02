@@ -11,9 +11,11 @@ interface ProductTableProps {
   products: Product[];
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
+  highlightedProductId?: string | null;
+  productsWithComposition?: string[]; // Array of product IDs that have composition
 }
 
-export function ProductTable({ products, onEdit, onDelete }: ProductTableProps) {
+export function ProductTable({ products, onEdit, onDelete, highlightedProductId }: ProductTableProps) {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
@@ -27,13 +29,20 @@ export function ProductTable({ products, onEdit, onDelete }: ProductTableProps) 
       key: 'name',
       header: 'Produk',
       render: (product: Product) => (
-        <div className="flex items-center gap-3">
+        <div className={`flex items-center gap-3 ${
+          highlightedProductId === product.id ? 'bg-yellow-100 p-2 rounded-lg border-2 border-yellow-300' : ''
+        }`}>
           <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
             <span className="text-red-600 font-semibold text-sm">
               {product.name.charAt(0)}
             </span>
           </div>
-          <span className="font-medium">{product.name}</span>
+          <div>
+            <span className="font-medium">{product.name}</span>
+            {highlightedProductId === product.id && (
+              <div className="text-xs text-yellow-700 font-medium">Komposisi Ditambahkan!</div>
+            )}
+          </div>
         </div>
       ),
     },

@@ -3,14 +3,16 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Coffee, RefreshCw, LogOut, ClipboardList, Package } from 'lucide-react';
+import { NotificationBell } from '@/components/features/notifications/NotificationBell';
 
 interface BaristaHeaderProps {
   activeOrdersCount?: number;
   onRefresh?: () => void;
   onSignOut?: () => void;
+  onNewProductClick?: (productId: string) => void;
 }
 
-export function BaristaHeader({ activeOrdersCount = 0, onRefresh, onSignOut }: BaristaHeaderProps) {
+export function BaristaHeader({ activeOrdersCount = 0, onRefresh, onSignOut, onNewProductClick }: BaristaHeaderProps) {
   const pathname = usePathname();
   
   const navItems = [
@@ -56,6 +58,9 @@ export function BaristaHeader({ activeOrdersCount = 0, onRefresh, onSignOut }: B
         </div>
         
         <div className="flex items-center gap-4">
+          {/* Notification Bell */}
+          <NotificationBell onNewProductClick={onNewProductClick} />
+          
           {pathname === '/barista' && (
             <>
               <div className="text-right">
@@ -74,10 +79,10 @@ export function BaristaHeader({ activeOrdersCount = 0, onRefresh, onSignOut }: B
           <button
             onClick={onSignOut}
             className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
-            title="Sign Out"
+            title="Keluar"
           >
             <LogOut size={18} />
-            <span className="text-sm font-medium">Sign Out</span>
+            <span className="text-sm font-medium">Keluar</span>
           </button>
         </div>
       </div>

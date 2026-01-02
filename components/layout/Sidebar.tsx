@@ -51,7 +51,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-64 min-h-screen bg-white border-r border-gray-200 flex flex-col">
+    <aside className="w-64 h-screen bg-white border-r border-gray-200 flex flex-col sticky top-0">
       {/* Logo */}
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center gap-3">
@@ -74,7 +74,7 @@ export default function Sidebar() {
       )}
 
       {/* Navigation Menu */}
-      <nav className="flex-1 p-4">
+      <nav className="flex-1 p-4 overflow-y-auto">
         <ul className="space-y-1">
           {menuItems
             .filter((item) => !item.roles || (user && item.roles.includes(user.role)))
@@ -97,13 +97,14 @@ export default function Sidebar() {
       </nav>
 
       {/* Logout Button */}
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-gray-200 bg-white">
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-4 py-3 w-full rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+          className="flex items-center gap-3 px-4 py-3 w-full rounded-lg text-red-600 hover:bg-red-50 transition-colors font-medium"
+          title="Keluar dari sistem"
         >
           <LogOut size={20} />
-          <span className="text-sm font-medium">Keluar</span>
+          <span className="text-sm">Keluar</span>
         </button>
       </div>
     </aside>

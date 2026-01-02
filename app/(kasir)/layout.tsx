@@ -67,9 +67,10 @@ export default function KasirLayout({
           <button
             onClick={handleLogout}
             className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
+            title="Keluar"
           >
             <LogOut size={18} />
-            <span className="text-sm font-medium">Sign Out</span>
+            <span className="text-sm font-medium">Keluar</span>
           </button>
         </div>
       </header>

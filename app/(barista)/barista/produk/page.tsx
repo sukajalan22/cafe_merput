@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import { Search, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '@/lib/context/AuthContext';
 import { BaristaHeader } from '@/components/features/barista';
 import { Button } from '@/components/ui/Button';
 import { Table } from '@/components/ui/Table';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { Input } from '@/components/ui/Input';
 import { ProductCategory } from '@/lib/types';
 
 interface ProductMaterial {
@@ -36,8 +35,6 @@ interface ApiMaterial {
   stok_saat_ini: number;
 }
 
-const categories: ProductCategory[] = ['Kopi', 'Non-Kopi', 'Makanan'];
-
 export default function BaristaProductPage() {
   const router = useRouter();
   const { logout } = useAuth();
@@ -47,21 +44,37 @@ export default function BaristaProductPage() {
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ApiProduct | null>(null);
-  const [deleteProduct, setDeleteProduct] = useState<ApiProduct | null>(null);
+  const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    category: 'Kopi' as ProductCategory,
-    price: '',
-    compositions: [] as { bahan_id: string; jumlah: string }[],
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const ITEMS_PER_PAGE = 10;
+
+  // Check for highlight parameter from URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const highlight = urlParams.get('highlight');
+    if (highlight) {
+      setHighlightedProductId(highlight);
+      // Remove highlight after 5 seconds
+      setTimeout(() => setHighlightedProductId(null), 5000);
+    }
+  }, []);
 
   const handleLogout = () => {
     logout();
     router.push('/login');
   };
+
+  const handleNewProductClick = (productId: string) => {
+    setHighlightedProductId(productId);
+    // Remove highlight after 5 seconds
+    setTimeout(() => setHighlightedProductId(null), 5000);
+  };
+
+  // Form state for compositions only
+  const [formData, setFormData] = useState({
+    compositions: [] as { bahan_id: string; jumlah: string }[],
+  });
 
   const fetchProducts = async () => {
     try {
@@ -106,28 +119,9 @@ export default function BaristaProductPage() {
     fetchMaterials();
   }, []);
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      category: 'Kopi',
-      price: '',
-      compositions: [],
-    });
-    setErrors({});
-    setEditingProduct(null);
-  };
-
-  const openAddModal = () => {
-    resetForm();
-    setIsModalOpen(true);
-  };
-
   const openEditModal = (product: ApiProduct) => {
     setEditingProduct(product);
     setFormData({
-      name: product.nama_produk,
-      category: product.jenis_produk,
-      price: product.harga.toString(),
       compositions: product.materials?.map((m) => ({
         bahan_id: m.bahan_id,
         jumlah: m.jumlah.toString(),
@@ -159,62 +153,17 @@ export default function BaristaProductPage() {
     }));
   };
 
-  const validate = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    if (!formData.name.trim()) newErrors.name = 'Nama produk wajib diisi';
-    if (!formData.price || Number(formData.price) <= 0) newErrors.price = 'Harga harus lebih dari 0';
-    
-    formData.compositions.forEach((c, i) => {
-      if (c.bahan_id && (!c.jumlah || Number(c.jumlah) <= 0)) {
-        newErrors[`composition_${i}`] = 'Jumlah harus lebih dari 0';
-      }
-    });
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (!editingProduct) return;
 
     try {
-      const productData = {
-        nama_produk: formData.name,
-        jenis_produk: formData.category,
-        harga: Number(formData.price),
-      };
-
-      let productId: string;
-
-      if (editingProduct) {
-        // Update product
-        const res = await fetch(`/api/products/${editingProduct.produk_id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(productData),
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.message);
-        productId = editingProduct.produk_id;
-      } else {
-        // Create product
-        const res = await fetch('/api/products', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(productData),
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.message);
-        productId = data.data.produk_id;
-      }
-
-      // Update materials/compositions
+      // Update materials/compositions only
       const validCompositions = formData.compositions.filter(
         (c) => c.bahan_id && c.jumlah && Number(c.jumlah) > 0
       );
 
-      await fetch(`/api/products/${productId}/materials`, {
+      const res = await fetch(`/api/products/${editingProduct.produk_id}/materials`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -225,35 +174,32 @@ export default function BaristaProductPage() {
         }),
       });
 
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+
       setIsModalOpen(false);
-      resetForm();
+      setEditingProduct(null);
       fetchProducts();
     } catch (error) {
-      console.error('Error saving product:', error);
-      alert('Gagal menyimpan produk');
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deleteProduct) return;
-    try {
-      const res = await fetch(`/api/products/${deleteProduct.produk_id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (data.success) {
-        setDeleteProduct(null);
-        fetchProducts();
-      } else {
-        alert(data.message || 'Gagal menghapus produk');
-      }
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      alert('Gagal menghapus produk');
+      console.error('Error saving compositions:', error);
+      alert('Gagal menyimpan komposisi');
     }
   };
 
   const filteredProducts = products.filter((p) =>
     p.nama_produk?.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Pagination
+  const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const currentProducts = filteredProducts.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
@@ -263,11 +209,18 @@ export default function BaristaProductPage() {
       key: 'nama_produk',
       header: 'Produk',
       render: (product: ApiProduct) => (
-        <div className="flex items-center gap-3">
+        <div className={`flex items-center gap-3 ${
+          highlightedProductId === product.produk_id ? 'bg-yellow-100 p-2 rounded-lg border-2 border-yellow-300' : ''
+        }`}>
           <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
             <span className="text-red-600 font-semibold text-sm">{product.nama_produk?.charAt(0)}</span>
           </div>
-          <span className="font-medium">{product.nama_produk}</span>
+          <div>
+            <span className="font-medium">{product.nama_produk}</span>
+            {highlightedProductId === product.produk_id && (
+              <div className="text-xs text-yellow-700 font-medium">Produk Baru!</div>
+            )}
+          </div>
         </div>
       ),
     },
@@ -297,28 +250,31 @@ export default function BaristaProductPage() {
       key: 'actions',
       header: 'Aksi',
       render: (product: ApiProduct) => (
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => openEditModal(product)} icon={<Pencil className="h-4 w-4" />}>
-            Edit
-          </Button>
-          <Button variant="danger" size="sm" onClick={() => setDeleteProduct(product)} icon={<Trash2 className="h-4 w-4" />}>
-            Hapus
-          </Button>
-        </div>
+        <button
+          onClick={() => openEditModal(product)}
+          className="inline-flex items-center gap-2 px-3 py-1.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 text-sm font-medium rounded-lg transition-colors duration-200 border border-yellow-200 hover:border-yellow-300"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          <span>Edit</span>
+        </button>
       ),
     },
   ];
 
   return (
     <div className="min-h-screen flex flex-col">
-      <BaristaHeader onSignOut={handleLogout} />
+      <BaristaHeader onSignOut={handleLogout} onNewProductClick={handleNewProductClick} />
 
       <div className="flex-1 p-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-900">Data Produk</h2>
-              <Button onClick={openAddModal} icon={<Plus className="h-4 w-4" />}>Tambah Produk</Button>
+              {totalPages > 1 && (
+                <span className="text-sm text-gray-500">
+                  Halaman {currentPage} dari {totalPages}
+                </span>
+              )}
             </div>
             <div className="mt-4 relative max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -336,39 +292,99 @@ export default function BaristaProductPage() {
             {loading ? (
               <div className="text-center py-8 text-gray-500">Memuat data...</div>
             ) : (
-              <Table columns={columns} data={filteredProducts} />
+              <>
+                <Table columns={columns} data={currentProducts} />
+                
+                {/* Pagination */}
+                {filteredProducts.length > 0 && (
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                    <p className="text-sm text-gray-500">
+                      Menampilkan {startIndex + 1}-{Math.min(endIndex, filteredProducts.length)} dari {filteredProducts.length} produk
+                    </p>
+                    {totalPages > 1 && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                          let pageNum;
+                          if (totalPages <= 5) {
+                            pageNum = i + 1;
+                          } else if (currentPage <= 3) {
+                            pageNum = i + 1;
+                          } else if (currentPage >= totalPages - 2) {
+                            pageNum = totalPages - 4 + i;
+                          } else {
+                            pageNum = currentPage - 2 + i;
+                          }
+                          return (
+                            <Button
+                              key={pageNum}
+                              variant={currentPage === pageNum ? 'primary' : 'secondary'}
+                              size="sm"
+                              onClick={() => setCurrentPage(pageNum)}
+                            >
+                              {pageNum}
+                            </Button>
+                          );
+                        })}
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingProduct ? 'Edit Produk' : 'Tambah Produk'}>
+      {/* Edit Compositions Modal */}
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingProduct(null);
+        }} 
+        title={`Edit Komposisi - ${editingProduct?.nama_produk}`}
+      >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input label="Nama Produk" value={formData.name} onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))} error={errors.name} />
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Kategori</label>
-            <select
-              value={formData.category}
-              onChange={(e) => setFormData((p) => ({ ...p, category: e.target.value as ProductCategory }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-            >
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
+          <div className="bg-gray-50 p-4 rounded-lg mb-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600">Produk:</span>
+                <p className="font-medium">{editingProduct?.nama_produk}</p>
+              </div>
+              <div>
+                <span className="text-gray-600">Kategori:</span>
+                <p className="font-medium">{editingProduct?.jenis_produk}</p>
+              </div>
+            </div>
           </div>
-
-          <Input label="Harga (Rp)" type="number" value={formData.price} onChange={(e) => setFormData((p) => ({ ...p, price: e.target.value }))} error={errors.price} />
 
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-medium text-gray-700">Komposisi Bahan</label>
-              <Button type="button" variant="secondary" size="sm" onClick={addComposition}>+ Tambah Bahan</Button>
+              <Button type="button" variant="secondary" size="sm" onClick={addComposition}>
+                + Tambah Bahan
+              </Button>
             </div>
             {formData.compositions.length === 0 ? (
-              <p className="text-sm text-gray-500">Belum ada komposisi bahan</p>
+              <p className="text-sm text-gray-500 py-4 text-center bg-gray-50 rounded-lg">
+                Belum ada komposisi bahan. Klik "Tambah Bahan" untuk menambahkan.
+              </p>
             ) : (
               <div className="space-y-2">
                 {formData.compositions.map((comp, idx) => (
@@ -380,37 +396,47 @@ export default function BaristaProductPage() {
                     >
                       <option value="">Pilih bahan</option>
                       {materials.map((m) => (
-                        <option key={m.bahan_id} value={m.bahan_id}>{m.nama_bahan} ({m.satuan})</option>
+                        <option key={m.bahan_id} value={m.bahan_id}>
+                          {m.nama_bahan} ({m.satuan})
+                        </option>
                       ))}
                     </select>
                     <input
                       type="number"
+                      step="0.01"
                       placeholder="Jumlah"
                       value={comp.jumlah}
                       onChange={(e) => updateComposition(idx, 'jumlah', e.target.value)}
                       className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
                     />
-                    <Button type="button" variant="danger" size="sm" onClick={() => removeComposition(idx)}>×</Button>
+                    <Button 
+                      type="button" 
+                      variant="danger" 
+                      size="sm" 
+                      onClick={() => removeComposition(idx)}
+                    >
+                      ×
+                    </Button>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
-            <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>Batal</Button>
-            <Button type="submit">{editingProduct ? 'Simpan' : 'Tambah'}</Button>
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button 
+              type="button" 
+              variant="secondary" 
+              onClick={() => {
+                setIsModalOpen(false);
+                setEditingProduct(null);
+              }}
+            >
+              Batal
+            </Button>
+            <Button type="submit">Simpan Komposisi</Button>
           </div>
         </form>
-      </Modal>
-
-      {/* Delete Confirmation Modal */}
-      <Modal isOpen={!!deleteProduct} onClose={() => setDeleteProduct(null)} title="Hapus Produk">
-        <p className="text-gray-600 mb-6">Apakah Anda yakin ingin menghapus produk <strong>{deleteProduct?.nama_produk}</strong>?</p>
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={() => setDeleteProduct(null)}>Batal</Button>
-          <Button variant="danger" onClick={handleDelete}>Hapus</Button>
-        </div>
       </Modal>
     </div>
   );

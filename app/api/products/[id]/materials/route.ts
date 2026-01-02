@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import * as productsQuery from '@/lib/db/queries/products';
 import * as productMaterialsQuery from '@/lib/db/queries/product-materials';
 import * as materialsQuery from '@/lib/db/queries/materials';
+import * as notificationsQuery from '@/lib/db/queries/notifications';
 import { addMaterialToProductSchema } from '@/lib/validations/product-material';
 import {
   successResponse,
@@ -10,6 +11,7 @@ import {
   notFoundResponse,
   serverErrorResponse,
 } from '@/lib/utils/response';
+import { sendNotificationToRole } from '@/lib/services/realtime-notifications';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -108,10 +110,15 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       return errorResponse('Data materials harus berupa array', 400);
     }
 
+    // Check if this is the first time adding materials (was empty before)
+    const existingMaterials = await productMaterialsQuery.getByProductId(id);
+    const isFirstTimeAddingMaterials = existingMaterials.length === 0 && materials.length > 0;
+
     // Delete all existing materials for this product
     await productMaterialsQuery.deleteAllByProductId(id);
 
     // Add new materials
+    const addedMaterials = [];
     for (const mat of materials) {
       if (mat.bahan_id && mat.jumlah > 0) {
         // Check if material exists
@@ -122,7 +129,61 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
             bahan_id: mat.bahan_id,
             jumlah: mat.jumlah,
           });
+          addedMaterials.push({
+            name: material.nama_bahan,
+            quantity: mat.jumlah,
+            unit: material.satuan
+          });
         }
+      }
+    }
+
+    // Send notification to admin if this is the first time adding materials
+    if (isFirstTimeAddingMaterials && addedMaterials.length > 0) {
+      try {
+        const materialsText = addedMaterials
+          .map(m => `${m.name} (${m.quantity} ${m.unit})`)
+          .join(', ');
+
+        const notificationData = {
+          productId: product.produk_id,
+          productName: product.nama_produk,
+          materials: addedMaterials,
+          action: 'composition_added'
+        };
+
+        await notificationsQuery.createForRole(
+          'Admin',
+          'MATERIAL_UPDATE',
+          'Komposisi Produk Ditambahkan',
+          `Komposisi bahan untuk produk "${product.nama_produk}" telah ditambahkan oleh barista. Bahan: ${materialsText}`,
+          notificationData
+        );
+
+        // Send real-time notification
+        await sendNotificationToRole('Admin', {
+          id: Date.now().toString(), // Temporary ID for real-time
+          type: 'MATERIAL_UPDATE',
+          title: 'Komposisi Produk Ditambahkan',
+          message: `Komposisi bahan untuk produk "${product.nama_produk}" telah ditambahkan oleh barista. Bahan: ${materialsText}`,
+          data: notificationData,
+          isRead: false,
+          createdAt: new Date(),
+        });
+
+        // Also send to Manager role
+        await sendNotificationToRole('Manager', {
+          id: Date.now().toString(),
+          type: 'MATERIAL_UPDATE',
+          title: 'Komposisi Produk Ditambahkan',
+          message: `Komposisi bahan untuk produk "${product.nama_produk}" telah ditambahkan oleh barista. Bahan: ${materialsText}`,
+          data: notificationData,
+          isRead: false,
+          createdAt: new Date(),
+        });
+      } catch (notificationError) {
+        console.error('Failed to send composition notification:', notificationError);
+        // Don't fail the material update if notification fails
       }
     }
 

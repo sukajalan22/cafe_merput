@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import * as productsQuery from '@/lib/db/queries/products';
+import * as notificationsQuery from '@/lib/db/queries/notifications';
 import { createProductSchema } from '@/lib/validations/product';
 import {
   successResponse,
@@ -7,6 +8,7 @@ import {
   errorResponse,
   serverErrorResponse,
 } from '@/lib/utils/response';
+import { sendNotificationToRole } from '@/lib/services/realtime-notifications';
 
 /**
  * GET /api/products
@@ -47,6 +49,39 @@ export async function POST(request: NextRequest) {
 
     // Create product
     const product = await productsQuery.create(validation.data);
+
+    // Send notification to all baristas about new product
+    try {
+      const notificationData = {
+        productId: product.produk_id,
+        productName: product.nama_produk,
+        category: product.jenis_produk,
+        price: product.harga,
+      };
+
+      await notificationsQuery.createForRole(
+        'Barista',
+        'NEW_PRODUCT',
+        'Produk Baru Ditambahkan',
+        `Produk "${product.nama_produk}" telah ditambahkan. Silakan atur komposisi bahan untuk produk ini.`,
+        notificationData
+      );
+
+      // Send real-time notification
+      await sendNotificationToRole('Barista', {
+        id: Date.now().toString(), // Temporary ID for real-time
+        type: 'NEW_PRODUCT',
+        title: 'Produk Baru Ditambahkan',
+        message: `Produk "${product.nama_produk}" telah ditambahkan. Silakan atur komposisi bahan untuk produk ini.`,
+        data: notificationData,
+        isRead: false,
+        createdAt: new Date(),
+      });
+    } catch (notificationError) {
+      console.error('Failed to send notification:', notificationError);
+      // Don't fail the product creation if notification fails
+    }
+
     return createdResponse(product, 'Produk berhasil dibuat');
   } catch (error) {
     console.error('Error creating product:', error);

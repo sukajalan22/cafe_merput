@@ -2,6 +2,7 @@
 -- Schema for Cafe Merah Putih Management System
 
 -- Drop tables if exist (in reverse order of dependencies)
+DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS transaction_items;
 DROP TABLE IF EXISTS transactions;
 DROP TABLE IF EXISTS material_orders;
@@ -127,6 +128,19 @@ CREATE TABLE barista_order_items (
   FOREIGN KEY (produk_id) REFERENCES products(produk_id) ON DELETE CASCADE
 );
 
+-- Notifications table
+CREATE TABLE notifications (
+  notification_id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
+  type ENUM('NEW_PRODUCT', 'MATERIAL_UPDATE', 'STOCK_ALERT') NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  data JSON,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
 
 -- Indexes for better query performance
 CREATE INDEX idx_users_role ON users(role_id);
@@ -148,6 +162,9 @@ CREATE INDEX idx_barista_orders_status ON barista_orders(status);
 CREATE INDEX idx_barista_orders_cashier ON barista_orders(cashier_id);
 CREATE INDEX idx_barista_orders_created ON barista_orders(created_at);
 CREATE INDEX idx_barista_order_items_order ON barista_order_items(order_id);
+CREATE INDEX idx_notifications_user ON notifications(user_id);
+CREATE INDEX idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX idx_notifications_created ON notifications(created_at);
 
 -- Insert default roles
 INSERT INTO roles (role_id, nama_role) VALUES 

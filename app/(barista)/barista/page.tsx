@@ -29,6 +29,11 @@ export default function BaristaDashboardPage() {
     await refreshOrders();
   }, [refreshOrders]);
 
+  const handleNewProductClick = (productId: string) => {
+    // Navigate to product page with the specific product highlighted
+    router.push(`/barista/produk?highlight=${productId}`);
+  };
+
   const handleStatusChange = useCallback(async (orderId: string, newStatus: BaristaOrderStatus) => {
     try {
       await updateOrderStatus(orderId, newStatus);
@@ -72,6 +77,7 @@ export default function BaristaDashboardPage() {
         activeOrdersCount={activeOrdersCount}
         onRefresh={handleRefresh}
         onSignOut={handleLogout}
+        onNewProductClick={handleNewProductClick}
       />
 
       {/* Order Stats */}

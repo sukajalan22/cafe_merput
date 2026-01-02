@@ -137,30 +137,40 @@ export function TransactionList({ onViewDetail }: TransactionListProps) {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <SearchInput
           placeholder="Cari transaksi..."
           value={searchQuery}
-          onSearch={setSearchQuery}
-          className="flex-1"
+          onSearch={(value) => {
+            setSearchQuery(value);
+            setCurrentPage(1);
+          }}
+          className="flex-1 max-w-md"
         />
-        <div className="flex gap-2">
-          {(['today', 'week', 'month', 'all'] as const).map((filter) => (
-            <Button
-              key={filter}
-              variant={dateFilter === filter ? 'primary' : 'secondary'}
-              size="sm"
-              onClick={() => {
-                setDateFilter(filter);
-                setCurrentPage(1);
-              }}
-            >
-              {filter === 'today' && 'Hari Ini'}
-              {filter === 'week' && '7 Hari'}
-              {filter === 'month' && 'Bulan Ini'}
-              {filter === 'all' && 'Semua'}
-            </Button>
-          ))}
+        <div className="flex items-center gap-4">
+          {totalPages > 1 && (
+            <span className="text-sm text-gray-500">
+              Halaman {currentPage} dari {totalPages}
+            </span>
+          )}
+          <div className="flex gap-2">
+            {(['today', 'week', 'month', 'all'] as const).map((filter) => (
+              <Button
+                key={filter}
+                variant={dateFilter === filter ? 'primary' : 'secondary'}
+                size="sm"
+                onClick={() => {
+                  setDateFilter(filter);
+                  setCurrentPage(1);
+                }}
+              >
+                {filter === 'today' && 'Hari Ini'}
+                {filter === 'week' && '7 Hari'}
+                {filter === 'month' && 'Bulan Ini'}
+                {filter === 'all' && 'Semua'}
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -185,6 +195,9 @@ export function TransactionList({ onViewDetail }: TransactionListProps) {
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      No
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       ID Transaksi
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -202,8 +215,11 @@ export function TransactionList({ onViewDetail }: TransactionListProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {paginatedTransactions.map((transaction) => (
+                  {paginatedTransactions.map((transaction, index) => (
                     <tr key={transaction.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {(currentPage - 1) * itemsPerPage + index + 1}
+                      </td>
                       <td className="px-4 py-3">
                         <span className="text-sm font-mono text-gray-900">
                           #{transaction.id.slice(-8).toUpperCase()}
@@ -254,31 +270,55 @@ export function TransactionList({ onViewDetail }: TransactionListProps) {
             </div>
 
             {/* Pagination */}
-            {totalPages > 1 && (
+            {filteredTransactions.length > 0 && (
               <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
                 <p className="text-sm text-gray-500">
                   Menampilkan {(currentPage - 1) * itemsPerPage + 1} -{' '}
                   {Math.min(currentPage * itemsPerPage, filteredTransactions.length)} dari{' '}
                   {filteredTransactions.length} transaksi
                 </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage((p) => p - 1)}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage((p) => p + 1)}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((p) => p - 1)}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? 'primary' : 'secondary'}
+                          size="sm"
+                          onClick={() => setCurrentPage(pageNum)}
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage((p) => p + 1)}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </>
