@@ -34,23 +34,28 @@ interface CategorySalesRow extends RowDataPacket {
  */
 export async function getSummary(period: 'daily' | 'weekly' | 'monthly'): Promise<ReportSummary> {
   let dateCondition: string;
+  let expenseDateCondition: string;
   let periodLabel: string;
 
   switch (period) {
     case 'daily':
-      dateCondition = 'DATE(tanggal) = CURDATE()';
+      dateCondition = "DATE(tanggal) = CURRENT_DATE";
+      expenseDateCondition = "DATE(tanggal_terima) = CURRENT_DATE";
       periodLabel = 'Hari Ini';
       break;
     case 'weekly':
-      dateCondition = 'tanggal >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)';
+      dateCondition = "tanggal >= CURRENT_DATE - INTERVAL '7 days'";
+      expenseDateCondition = "tanggal_terima >= CURRENT_DATE - INTERVAL '7 days'";
       periodLabel = 'Minggu Ini';
       break;
     case 'monthly':
-      dateCondition = 'MONTH(tanggal) = MONTH(CURDATE()) AND YEAR(tanggal) = YEAR(CURDATE())';
+      dateCondition = "EXTRACT(MONTH FROM tanggal) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM tanggal) = EXTRACT(YEAR FROM CURRENT_DATE)";
+      expenseDateCondition = "EXTRACT(MONTH FROM tanggal_terima) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM tanggal_terima) = EXTRACT(YEAR FROM CURRENT_DATE)";
       periodLabel = 'Bulan Ini';
       break;
     default:
-      dateCondition = 'DATE(tanggal) = CURDATE()';
+      dateCondition = "DATE(tanggal) = CURRENT_DATE";
+      expenseDateCondition = "DATE(tanggal_terima) = CURRENT_DATE";
       periodLabel = 'Hari Ini';
   }
 
@@ -62,22 +67,6 @@ export async function getSummary(period: 'daily' | 'weekly' | 'monthly'): Promis
   `;
   const revenueRows = await query<(RowDataPacket & { revenue: number; transactions: number })[]>(revenueSql);
 
-  // Get expenses from material orders (received orders)
-  let expenseDateCondition: string;
-  switch (period) {
-    case 'daily':
-      expenseDateCondition = 'DATE(tanggal_terima) = CURDATE()';
-      break;
-    case 'weekly':
-      expenseDateCondition = 'tanggal_terima >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)';
-      break;
-    case 'monthly':
-      expenseDateCondition = 'MONTH(tanggal_terima) = MONTH(CURDATE()) AND YEAR(tanggal_terima) = YEAR(CURDATE())';
-      break;
-    default:
-      expenseDateCondition = 'DATE(tanggal_terima) = CURDATE()';
-  }
-
   // Note: Using harga field from material_orders for actual expenses
   const expensesSql = `
     SELECT COALESCE(SUM(harga), 0) as expenses
@@ -86,10 +75,10 @@ export async function getSummary(period: 'daily' | 'weekly' | 'monthly'): Promis
   `;
   const expensesRows = await query<(RowDataPacket & { expenses: number })[]>(expensesSql);
 
-  const revenue = revenueRows[0].revenue;
-  const expenses = expensesRows[0].expenses;
+  const revenue = Number(revenueRows[0].revenue) || 0;
+  const expenses = Number(expensesRows[0].expenses) || 0;
   const profit = revenue - expenses;
-  const transactions = revenueRows[0].transactions;
+  const transactions = Number(revenueRows[0].transactions) || 0;
 
   return {
     revenue,
@@ -107,34 +96,28 @@ export async function getRevenueExpense(months: number = 6): Promise<RevenueExpe
   // Get revenue by month
   const revenueSql = `
     SELECT 
-      DATE_FORMAT(tanggal, '%b') as month,
-      DATE_FORMAT(tanggal, '%Y-%m') as yearMonth,
+      TO_CHAR(tanggal, 'Mon') as month,
+      TO_CHAR(tanggal, 'YYYY-MM') as "yearMonth",
       COALESCE(SUM(total_harga), 0) as revenue
     FROM transactions
-    WHERE tanggal >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
-    GROUP BY DATE_FORMAT(tanggal, '%Y-%m'), DATE_FORMAT(tanggal, '%b')
-    ORDER BY yearMonth ASC
+    WHERE tanggal >= CURRENT_DATE - INTERVAL '${months} months'
+    GROUP BY TO_CHAR(tanggal, 'YYYY-MM'), TO_CHAR(tanggal, 'Mon')
+    ORDER BY "yearMonth" ASC
   `;
-  const revenueRows = await query<(RowDataPacket & { month: string; yearMonth: string; revenue: number })[]>(
-    revenueSql,
-    [months]
-  );
+  const revenueRows = await query<(RowDataPacket & { month: string; yearMonth: string; revenue: number })[]>(revenueSql);
 
   // Get expenses by month (from received material orders using harga field)
   const expenseSql = `
     SELECT 
-      DATE_FORMAT(tanggal_terima, '%b') as month,
-      DATE_FORMAT(tanggal_terima, '%Y-%m') as yearMonth,
+      TO_CHAR(tanggal_terima, 'Mon') as month,
+      TO_CHAR(tanggal_terima, 'YYYY-MM') as "yearMonth",
       COALESCE(SUM(harga), 0) as expense
     FROM material_orders
-    WHERE status = 'Diterima' AND tanggal_terima >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
-    GROUP BY DATE_FORMAT(tanggal_terima, '%Y-%m'), DATE_FORMAT(tanggal_terima, '%b')
-    ORDER BY yearMonth ASC
+    WHERE status = 'Diterima' AND tanggal_terima >= CURRENT_DATE - INTERVAL '${months} months'
+    GROUP BY TO_CHAR(tanggal_terima, 'YYYY-MM'), TO_CHAR(tanggal_terima, 'Mon')
+    ORDER BY "yearMonth" ASC
   `;
-  const expenseRows = await query<(RowDataPacket & { month: string; yearMonth: string; expense: number })[]>(
-    expenseSql,
-    [months]
-  );
+  const expenseRows = await query<(RowDataPacket & { month: string; yearMonth: string; expense: number })[]>(expenseSql);
 
   // Combine revenue and expense data
   const monthsData = new Map<string, RevenueExpenseData>();
@@ -152,7 +135,7 @@ export async function getRevenueExpense(months: number = 6): Promise<RevenueExpe
   for (const row of revenueRows) {
     const existing = monthsData.get(row.yearMonth);
     if (existing) {
-      existing.revenue = row.revenue;
+      existing.revenue = Number(row.revenue);
     }
   }
 
@@ -160,7 +143,7 @@ export async function getRevenueExpense(months: number = 6): Promise<RevenueExpe
   for (const row of expenseRows) {
     const existing = monthsData.get(row.yearMonth);
     if (existing) {
-      existing.expense = row.expense;
+      existing.expense = Number(row.expense);
     }
   }
 
@@ -173,12 +156,12 @@ export async function getRevenueExpense(months: number = 6): Promise<RevenueExpe
 export async function getCategorySales(): Promise<CategorySalesData[]> {
   const sql = `
     SELECT 
-      p.jenis_produk,
+      p.jenis_produk::text as jenis_produk,
       COALESCE(SUM(ti.jumlah * ti.harga_satuan), 0) as total
     FROM transaction_items ti
     INNER JOIN transactions t ON ti.transaksi_id = t.transaksi_id
     INNER JOIN products p ON ti.produk_id = p.produk_id
-    WHERE t.tanggal >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+    WHERE t.tanggal >= CURRENT_DATE - INTERVAL '30 days'
     GROUP BY p.jenis_produk
     ORDER BY total DESC
   `;
@@ -200,15 +183,15 @@ export async function getCategorySales(): Promise<CategorySalesData[]> {
 export async function getMonthlyRevenueTrend(months: number = 12): Promise<{ month: string; revenue: number }[]> {
   const sql = `
     SELECT 
-      DATE_FORMAT(tanggal, '%b %Y') as month,
+      TO_CHAR(tanggal, 'Mon YYYY') as month,
       COALESCE(SUM(total_harga), 0) as revenue
     FROM transactions
-    WHERE tanggal >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
-    GROUP BY DATE_FORMAT(tanggal, '%Y-%m'), DATE_FORMAT(tanggal, '%b %Y')
-    ORDER BY DATE_FORMAT(tanggal, '%Y-%m') ASC
+    WHERE tanggal >= CURRENT_DATE - INTERVAL '${months} months'
+    GROUP BY TO_CHAR(tanggal, 'YYYY-MM'), TO_CHAR(tanggal, 'Mon YYYY')
+    ORDER BY TO_CHAR(tanggal, 'YYYY-MM') ASC
   `;
-  const rows = await query<(RowDataPacket & { month: string; revenue: number })[]>(sql, [months]);
-  return rows;
+  const rows = await query<(RowDataPacket & { month: string; revenue: number })[]>(sql);
+  return rows.map(r => ({ month: r.month, revenue: Number(r.revenue) }));
 }
 
 /**
@@ -217,15 +200,15 @@ export async function getMonthlyRevenueTrend(months: number = 12): Promise<{ mon
 export async function getDailyRevenue(year: number, month: number): Promise<{ day: number; revenue: number }[]> {
   const sql = `
     SELECT 
-      DAY(tanggal) as day,
+      EXTRACT(DAY FROM tanggal)::int as day,
       COALESCE(SUM(total_harga), 0) as revenue
     FROM transactions
-    WHERE YEAR(tanggal) = ? AND MONTH(tanggal) = ?
-    GROUP BY DAY(tanggal)
+    WHERE EXTRACT(YEAR FROM tanggal) = ? AND EXTRACT(MONTH FROM tanggal) = ?
+    GROUP BY EXTRACT(DAY FROM tanggal)
     ORDER BY day ASC
   `;
   const rows = await query<(RowDataPacket & { day: number; revenue: number })[]>(sql, [year, month]);
-  return rows;
+  return rows.map(r => ({ day: r.day, revenue: Number(r.revenue) }));
 }
 
 // Daily revenue expense data interface
@@ -242,34 +225,28 @@ export async function getDailyRevenueExpense(days: number = 7): Promise<DailyRev
   // Get revenue by day
   const revenueSql = `
     SELECT 
-      DATE_FORMAT(tanggal, '%d/%m') as label,
-      DATE(tanggal) as dateKey,
+      TO_CHAR(tanggal, 'DD/MM') as label,
+      DATE(tanggal) as "dateKey",
       COALESCE(SUM(total_harga), 0) as revenue
     FROM transactions
-    WHERE tanggal >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-    GROUP BY DATE(tanggal), DATE_FORMAT(tanggal, '%d/%m')
-    ORDER BY dateKey ASC
+    WHERE tanggal >= CURRENT_DATE - INTERVAL '${days} days'
+    GROUP BY DATE(tanggal), TO_CHAR(tanggal, 'DD/MM')
+    ORDER BY "dateKey" ASC
   `;
-  const revenueRows = await query<(RowDataPacket & { label: string; dateKey: string; revenue: number })[]>(
-    revenueSql,
-    [days]
-  );
+  const revenueRows = await query<(RowDataPacket & { label: string; dateKey: string; revenue: number })[]>(revenueSql);
 
   // Get expenses by day (from received material orders using harga field)
   const expenseSql = `
     SELECT 
-      DATE_FORMAT(tanggal_terima, '%d/%m') as label,
-      DATE(tanggal_terima) as dateKey,
+      TO_CHAR(tanggal_terima, 'DD/MM') as label,
+      DATE(tanggal_terima) as "dateKey",
       COALESCE(SUM(harga), 0) as expense
     FROM material_orders
-    WHERE status = 'Diterima' AND tanggal_terima >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-    GROUP BY DATE(tanggal_terima), DATE_FORMAT(tanggal_terima, '%d/%m')
-    ORDER BY dateKey ASC
+    WHERE status = 'Diterima' AND tanggal_terima >= CURRENT_DATE - INTERVAL '${days} days'
+    GROUP BY DATE(tanggal_terima), TO_CHAR(tanggal_terima, 'DD/MM')
+    ORDER BY "dateKey" ASC
   `;
-  const expenseRows = await query<(RowDataPacket & { label: string; dateKey: string; expense: number })[]>(
-    expenseSql,
-    [days]
-  );
+  const expenseRows = await query<(RowDataPacket & { label: string; dateKey: string; expense: number })[]>(expenseSql);
 
   // Combine revenue and expense data
   const daysData = new Map<string, DailyRevenueExpenseData>();
@@ -288,7 +265,7 @@ export async function getDailyRevenueExpense(days: number = 7): Promise<DailyRev
     const dateKey = new Date(row.dateKey).toISOString().split('T')[0];
     const existing = daysData.get(dateKey);
     if (existing) {
-      existing.revenue = row.revenue;
+      existing.revenue = Number(row.revenue);
     }
   }
 
@@ -297,7 +274,7 @@ export async function getDailyRevenueExpense(days: number = 7): Promise<DailyRev
     const dateKey = new Date(row.dateKey).toISOString().split('T')[0];
     const existing = daysData.get(dateKey);
     if (existing) {
-      existing.expense = row.expense;
+      existing.expense = Number(row.expense);
     }
   }
 
@@ -315,37 +292,31 @@ export interface WeeklyRevenueExpenseData {
  * Get weekly revenue vs expense data for the last N weeks
  */
 export async function getWeeklyRevenueExpense(weeks: number = 4): Promise<WeeklyRevenueExpenseData[]> {
-  // Get revenue by week
+  // Get revenue by week using ISO week
   const revenueSql = `
     SELECT 
-      CONCAT('Minggu ', WEEK(tanggal, 1) - WEEK(DATE_SUB(CURDATE(), INTERVAL ? WEEK), 1) + 1) as label,
-      YEARWEEK(tanggal, 1) as weekKey,
+      'Minggu ' || EXTRACT(WEEK FROM tanggal)::text as label,
+      EXTRACT(YEAR FROM tanggal) * 100 + EXTRACT(WEEK FROM tanggal) as "weekKey",
       COALESCE(SUM(total_harga), 0) as revenue
     FROM transactions
-    WHERE tanggal >= DATE_SUB(CURDATE(), INTERVAL ? WEEK)
-    GROUP BY YEARWEEK(tanggal, 1)
-    ORDER BY weekKey ASC
+    WHERE tanggal >= CURRENT_DATE - INTERVAL '${weeks} weeks'
+    GROUP BY EXTRACT(YEAR FROM tanggal), EXTRACT(WEEK FROM tanggal)
+    ORDER BY "weekKey" ASC
   `;
-  const revenueRows = await query<(RowDataPacket & { label: string; weekKey: number; revenue: number })[]>(
-    revenueSql,
-    [weeks, weeks]
-  );
+  const revenueRows = await query<(RowDataPacket & { label: string; weekKey: number; revenue: number })[]>(revenueSql);
 
   // Get expenses by week
   const expenseSql = `
     SELECT 
-      CONCAT('Minggu ', WEEK(tanggal_terima, 1) - WEEK(DATE_SUB(CURDATE(), INTERVAL ? WEEK), 1) + 1) as label,
-      YEARWEEK(tanggal_terima, 1) as weekKey,
+      'Minggu ' || EXTRACT(WEEK FROM tanggal_terima)::text as label,
+      EXTRACT(YEAR FROM tanggal_terima) * 100 + EXTRACT(WEEK FROM tanggal_terima) as "weekKey",
       COALESCE(SUM(harga), 0) as expense
     FROM material_orders
-    WHERE status = 'Diterima' AND tanggal_terima >= DATE_SUB(CURDATE(), INTERVAL ? WEEK)
-    GROUP BY YEARWEEK(tanggal_terima, 1)
-    ORDER BY weekKey ASC
+    WHERE status = 'Diterima' AND tanggal_terima >= CURRENT_DATE - INTERVAL '${weeks} weeks'
+    GROUP BY EXTRACT(YEAR FROM tanggal_terima), EXTRACT(WEEK FROM tanggal_terima)
+    ORDER BY "weekKey" ASC
   `;
-  const expenseRows = await query<(RowDataPacket & { label: string; weekKey: number; expense: number })[]>(
-    expenseSql,
-    [weeks, weeks]
-  );
+  const expenseRows = await query<(RowDataPacket & { label: string; weekKey: number; expense: number })[]>(expenseSql);
 
   // Combine revenue and expense data
   const weeksData = new Map<number, WeeklyRevenueExpenseData>();

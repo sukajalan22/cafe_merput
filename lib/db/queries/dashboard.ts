@@ -39,23 +39,23 @@ interface TopProductRow extends RowDataPacket, TopProduct { }
 export async function getStats(): Promise<DashboardStats> {
   // Total sales today
   const totalSalesSql = `
-    SELECT COALESCE(SUM(total_harga), 0) as totalSales
+    SELECT COALESCE(SUM(total_harga), 0) as "totalSales"
     FROM transactions
-    WHERE DATE(tanggal) = CURDATE()
+    WHERE DATE(tanggal) = CURRENT_DATE
   `;
   const totalSalesRows = await query<(RowDataPacket & { totalSales: number })[]>(totalSalesSql);
 
   // Today's transactions count
   const todayTransactionsSql = `
-    SELECT COUNT(*) as todayTransactions
+    SELECT COUNT(*) as "todayTransactions"
     FROM transactions
-    WHERE DATE(tanggal) = CURDATE()
+    WHERE DATE(tanggal) = CURRENT_DATE
   `;
   const todayTransactionsRows = await query<(RowDataPacket & { todayTransactions: number })[]>(todayTransactionsSql);
 
   // Active employees count
   const activeEmployeesSql = `
-    SELECT COUNT(*) as activeEmployees
+    SELECT COUNT(*) as "activeEmployees"
     FROM users
     WHERE status = 'Aktif'
   `;
@@ -63,18 +63,18 @@ export async function getStats(): Promise<DashboardStats> {
 
   // Products sold today
   const productsSoldSql = `
-    SELECT COALESCE(SUM(ti.jumlah), 0) as productsSold
+    SELECT COALESCE(SUM(ti.jumlah), 0) as "productsSold"
     FROM transaction_items ti
     JOIN transactions t ON ti.transaksi_id = t.transaksi_id
-    WHERE DATE(t.tanggal) = CURDATE()
+    WHERE DATE(t.tanggal) = CURRENT_DATE
   `;
   const productsSoldRows = await query<(RowDataPacket & { productsSold: number })[]>(productsSoldSql);
 
   return {
-    totalSales: totalSalesRows[0].totalSales,
-    todayTransactions: todayTransactionsRows[0].todayTransactions,
-    activeEmployees: activeEmployeesRows[0].activeEmployees,
-    productsSold: productsSoldRows[0].productsSold
+    totalSales: Number(totalSalesRows[0].totalSales) || 0,
+    todayTransactions: Number(todayTransactionsRows[0].todayTransactions) || 0,
+    activeEmployees: Number(activeEmployeesRows[0].activeEmployees) || 0,
+    productsSold: Number(productsSoldRows[0].productsSold) || 0
   };
 }
 
@@ -84,11 +84,11 @@ export async function getStats(): Promise<DashboardStats> {
 export async function getWeeklySales(): Promise<WeeklySalesData[]> {
   const sql = `
     SELECT 
-      DATE_FORMAT(tanggal, '%a') as day,
+      TO_CHAR(tanggal, 'Dy') as day,
       COALESCE(SUM(total_harga), 0) as sales
     FROM transactions
-    WHERE tanggal >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
-    GROUP BY DATE(tanggal), DATE_FORMAT(tanggal, '%a')
+    WHERE tanggal >= CURRENT_DATE - INTERVAL '6 days'
+    GROUP BY DATE(tanggal), TO_CHAR(tanggal, 'Dy')
     ORDER BY DATE(tanggal) ASC
   `;
   const rows = await query<WeeklySalesRow[]>(sql);
@@ -106,7 +106,7 @@ export async function getWeeklySales(): Promise<WeeklySalesData[]> {
     const existingData = rows.find(r => r.day === dayName);
     result.push({
       day: dayName,
-      sales: existingData ? existingData.sales : 0
+      sales: existingData ? Number(existingData.sales) : 0
     });
   }
 
@@ -121,19 +121,23 @@ export async function getTopProducts(limit: number = 5): Promise<TopProduct[]> {
     SELECT 
       p.produk_id,
       p.nama_produk,
-      p.jenis_produk,
-      COALESCE(SUM(ti.jumlah), 0) as totalSold,
+      p.jenis_produk::text as jenis_produk,
+      COALESCE(SUM(ti.jumlah), 0) as "totalSold",
       COALESCE(SUM(ti.jumlah * p.harga), 0) as revenue
     FROM products p
     LEFT JOIN transaction_items ti ON p.produk_id = ti.produk_id
     LEFT JOIN transactions t ON ti.transaksi_id = t.transaksi_id
-    WHERE t.tanggal >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) OR t.tanggal IS NULL
+    WHERE t.tanggal >= CURRENT_DATE - INTERVAL '30 days' OR t.tanggal IS NULL
     GROUP BY p.produk_id, p.nama_produk, p.jenis_produk
-    ORDER BY totalSold DESC
+    ORDER BY "totalSold" DESC
     LIMIT ?
   `;
   const rows = await query<TopProductRow[]>(sql, [limit]);
-  return rows;
+  return rows.map(r => ({
+    ...r,
+    totalSold: Number(r.totalSold),
+    revenue: Number(r.revenue)
+  }));
 }
 
 /**
@@ -144,7 +148,7 @@ export async function getSalesComparison(): Promise<{ current: number; previous:
   const currentSql = `
     SELECT COALESCE(SUM(total_harga), 0) as total
     FROM transactions
-    WHERE DATE(tanggal) = CURDATE()
+    WHERE DATE(tanggal) = CURRENT_DATE
   `;
   const currentRows = await query<(RowDataPacket & { total: number })[]>(currentSql);
 
@@ -152,12 +156,12 @@ export async function getSalesComparison(): Promise<{ current: number; previous:
   const previousSql = `
     SELECT COALESCE(SUM(total_harga), 0) as total
     FROM transactions
-    WHERE DATE(tanggal) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
+    WHERE DATE(tanggal) = CURRENT_DATE - INTERVAL '1 day'
   `;
   const previousRows = await query<(RowDataPacket & { total: number })[]>(previousSql);
 
-  const current = currentRows[0].total;
-  const previous = previousRows[0].total;
+  const current = Number(currentRows[0].total) || 0;
+  const previous = Number(previousRows[0].total) || 0;
   const change = previous > 0 ? ((current - previous) / previous) * 100 : 0;
 
   return { current, previous, change };

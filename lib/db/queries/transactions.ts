@@ -237,10 +237,10 @@ export async function getTodayCount(): Promise<number> {
   const sql = `
     SELECT COUNT(*) as count 
     FROM transactions 
-    WHERE DATE(tanggal) = CURDATE()
+    WHERE DATE(tanggal) = CURRENT_DATE
   `;
   const rows = await query<(RowDataPacket & { count: number })[]>(sql);
-  return rows[0].count;
+  return Number(rows[0].count) || 0;
 }
 
 /**
@@ -250,8 +250,9 @@ export async function getTodayTotal(): Promise<number> {
   const sql = `
     SELECT COALESCE(SUM(total_harga), 0) as total 
     FROM transactions 
-    WHERE DATE(tanggal) = CURDATE()
+    WHERE DATE(tanggal) = CURRENT_DATE
   `;
   const rows = await query<(RowDataPacket & { total: number })[]>(sql);
-  return rows[0].total;
+  return Number(rows[0].total) || 0;
 }
+
