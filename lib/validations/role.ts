@@ -6,7 +6,7 @@ import { z } from 'zod';
  */
 export const createRoleSchema = z.object({
   nama_role: z
-    .string({ required_error: 'Nama role wajib diisi' })
+    .string({ message: 'Nama role wajib diisi' })
     .min(1, 'Nama role wajib diisi')
     .max(50, 'Nama role maksimal 50 karakter'),
 });

@@ -2,15 +2,16 @@
 
 import React, { useEffect, useState } from 'react';
 import { X, Package, Info, AlertTriangle, Bell } from 'lucide-react';
-import { useRealTimeNotifications, type RealTimeNotification } from '@/lib/hooks/useRealTimeNotifications';
+import { useRealTimeNotifications } from '@/lib/hooks/useRealTimeNotifications';
+import { type Notification } from '@/lib/services/notifications';
 
-interface ToastNotification extends RealTimeNotification {
+interface ToastNotification extends Notification {
   id: string;
   showTime: number;
 }
 
 interface RealTimeNotificationToastProps {
-  onNotificationClick?: (notification: RealTimeNotification) => void;
+  onNotificationClick?: (notification: Notification) => void;
 }
 
 export function RealTimeNotificationToast({ onNotificationClick }: RealTimeNotificationToastProps) {
@@ -20,20 +21,20 @@ export function RealTimeNotificationToast({ onNotificationClick }: RealTimeNotif
   // Add new notifications as toasts
   useEffect(() => {
     console.log('🔍 Checking notifications for toasts:', notifications.length);
-    
+
     notifications.forEach(notification => {
       console.log('📋 Processing notification:', notification);
-      
+
       // Check if this notification is already shown as toast
-      const exists = toasts.some(toast => 
-        toast.type === notification.type && 
+      const exists = toasts.some(toast =>
+        toast.type === notification.type &&
         toast.title === notification.title &&
         Math.abs(new Date(toast.createdAt).getTime() - new Date(notification.createdAt).getTime()) < 5000
       );
 
       if (!exists) {
         console.log('🆕 Adding new toast for notification:', notification.title);
-        
+
         const toastNotification: ToastNotification = {
           ...notification,
           id: `toast-${Date.now()}-${Math.random()}`,
@@ -68,7 +69,7 @@ export function RealTimeNotificationToast({ onNotificationClick }: RealTimeNotif
     removeToast(toast.id);
   };
 
-  const getIcon = (type: RealTimeNotification['type']) => {
+  const getIcon = (type: Notification['type']) => {
     switch (type) {
       case 'NEW_PRODUCT':
         return <Package className="w-5 h-5 text-blue-600" />;
@@ -81,7 +82,7 @@ export function RealTimeNotificationToast({ onNotificationClick }: RealTimeNotif
     }
   };
 
-  const getToastColor = (type: RealTimeNotification['type']) => {
+  const getToastColor = (type: Notification['type']) => {
     switch (type) {
       case 'NEW_PRODUCT':
         return 'border-blue-200 bg-blue-50';

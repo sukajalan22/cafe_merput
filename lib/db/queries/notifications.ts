@@ -14,7 +14,7 @@ export interface Notification {
   created_at: Date;
 }
 
-interface NotificationRow extends RowDataPacket, Notification {}
+interface NotificationRow extends RowDataPacket, Notification { }
 
 // DTOs
 export interface CreateNotificationDTO {
@@ -50,7 +50,7 @@ export async function getByUserId(userId: string, unreadOnly: boolean = false): 
         parsedData = null;
       }
     }
-    
+
     return {
       ...row,
       data: parsedData,
@@ -63,12 +63,12 @@ export async function getByUserId(userId: string, unreadOnly: boolean = false): 
  */
 export async function create(data: CreateNotificationDTO): Promise<Notification> {
   const notificationId = uuidv4();
-  
+
   const sql = `
     INSERT INTO notifications (notification_id, user_id, type, title, message, data)
     VALUES (?, ?, ?, ?, ?, ?)
   `;
-  
+
   await execute(sql, [
     notificationId,
     data.user_id,
@@ -92,7 +92,7 @@ export async function create(data: CreateNotificationDTO): Promise<Notification>
 export async function getById(id: string): Promise<Notification | null> {
   const sql = 'SELECT * FROM notifications WHERE notification_id = ?';
   const rows = await query<NotificationRow[]>(sql, [id]);
-  
+
   if (rows.length === 0) {
     return null;
   }
@@ -107,7 +107,7 @@ export async function getById(id: string): Promise<Notification | null> {
       parsedData = null;
     }
   }
-  
+
   return {
     ...row,
     data: parsedData,
@@ -126,7 +126,7 @@ export async function markAsRead(notificationIds: string[], userId: string): Pro
     SET is_read = TRUE 
     WHERE notification_id IN (${placeholders}) AND user_id = ?
   `;
-  
+
   await execute(sql, [...notificationIds, userId]);
 }
 
@@ -147,9 +147,13 @@ export async function createForRole(
     JOIN roles r ON u.role_id = r.role_id 
     WHERE r.nama_role = ? AND u.status = 'Aktif'
   `;
-  
-  const users = await query<{ user_id: string }[]>(usersSql, [role]);
-  
+
+  interface UserRow extends RowDataPacket {
+    user_id: string;
+  }
+
+  const users = await query<UserRow[]>(usersSql, [role]);
+
   // Create notification for each user
   for (const user of users) {
     await create({
@@ -166,7 +170,11 @@ export async function createForRole(
  * Get unread count for a user
  */
 export async function getUnreadCount(userId: string): Promise<number> {
+  interface CountRow extends RowDataPacket {
+    count: number;
+  }
+
   const sql = 'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE';
-  const rows = await query<{ count: number }[]>(sql, [userId]);
+  const rows = await query<CountRow[]>(sql, [userId]);
   return rows[0]?.count || 0;
 }

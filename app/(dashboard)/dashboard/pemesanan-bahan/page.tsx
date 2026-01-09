@@ -6,7 +6,6 @@ import { MaterialOrder } from '@/lib/types';
 import {
   getOrders,
   searchOrders,
-  createOrder,
 } from '@/lib/services/orders';
 import { Button } from '@/components/ui/Button';
 import { SearchInput } from '@/components/ui/SearchInput';
@@ -67,8 +66,7 @@ export default function PemesananBahanPage() {
     setIsDetailOpen(true);
   };
 
-  const handleFormSubmit = (data: Omit<MaterialOrder, 'id' | 'total' | 'createdAt'>) => {
-    createOrder(data);
+  const handleFormSubmit = () => {
     refreshOrders();
     setIsFormOpen(false);
   };

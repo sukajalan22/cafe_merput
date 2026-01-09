@@ -7,13 +7,15 @@ import { z } from 'zod';
  */
 export const createProductMaterialSchema = z.object({
   produk_id: z
-    .string({ required_error: 'ID produk wajib diisi' })
+    .string({ message: 'ID produk wajib diisi' })
+    .min(1, 'ID produk wajib diisi')
     .uuid('Format ID produk tidak valid'),
   bahan_id: z
-    .string({ required_error: 'ID bahan wajib diisi' })
+    .string({ message: 'ID bahan wajib diisi' })
+    .min(1, 'ID bahan wajib diisi')
     .uuid('Format ID bahan tidak valid'),
   jumlah: z
-    .number({ required_error: 'Jumlah wajib diisi' })
+    .number({ message: 'Jumlah wajib diisi' })
     .positive('Jumlah harus lebih dari 0'),
 });
 
@@ -24,10 +26,11 @@ export const createProductMaterialSchema = z.object({
  */
 export const addMaterialToProductSchema = z.object({
   bahan_id: z
-    .string({ required_error: 'ID bahan wajib diisi' })
+    .string({ message: 'ID bahan wajib diisi' })
+    .min(1, 'ID bahan wajib diisi')
     .uuid('Format ID bahan tidak valid'),
   jumlah: z
-    .number({ required_error: 'Jumlah wajib diisi' })
+    .number({ message: 'Jumlah wajib diisi' })
     .positive('Jumlah harus lebih dari 0'),
 });
 
@@ -37,7 +40,7 @@ export const addMaterialToProductSchema = z.object({
  */
 export const updateProductMaterialSchema = z.object({
   jumlah: z
-    .number({ required_error: 'Jumlah wajib diisi' })
+    .number({ message: 'Jumlah wajib diisi' })
     .positive('Jumlah harus lebih dari 0'),
 });
 

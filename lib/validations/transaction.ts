@@ -6,10 +6,11 @@ import { z } from 'zod';
  */
 export const transactionItemSchema = z.object({
   produk_id: z
-    .string({ required_error: 'ID produk wajib diisi' })
+    .string({ message: 'ID produk wajib diisi' })
+    .min(1, 'ID produk wajib diisi')
     .uuid('Format ID produk tidak valid'),
   jumlah: z
-    .number({ required_error: 'Jumlah wajib diisi' })
+    .number({ message: 'Jumlah wajib diisi' })
     .int('Jumlah harus bilangan bulat')
     .positive('Jumlah harus lebih dari 0'),
 });
@@ -21,7 +22,8 @@ export const transactionItemSchema = z.object({
  */
 export const createTransactionSchema = z.object({
   user_id: z
-    .string({ required_error: 'ID user wajib diisi' })
+    .string({ message: 'ID user wajib diisi' })
+    .min(1, 'ID user wajib diisi')
     .uuid('Format ID user tidak valid'),
   items: z
     .array(transactionItemSchema)

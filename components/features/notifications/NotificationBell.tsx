@@ -18,7 +18,7 @@ export function NotificationBell({ onNewProductClick }: NotificationBellProps) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Use real-time notifications with polling
   const { isConnected, unreadCount: realtimeUnreadCount, refresh: refreshRealtime } = useRealTimeNotifications();
 
@@ -32,7 +32,7 @@ export function NotificationBell({ onNewProductClick }: NotificationBellProps) {
         setIsLoading(false);
         return;
       }
-      
+
       const data = await getNotifications();
       console.log('Fetched notifications:', data.length, 'items');
       setNotifications(data);
@@ -63,8 +63,8 @@ export function NotificationBell({ onNewProductClick }: NotificationBellProps) {
     try {
       const success = await markNotificationsAsRead(notificationIds);
       if (success) {
-        setNotifications(prev => 
-          prev.map(n => 
+        setNotifications(prev =>
+          prev.map(n =>
             notificationIds.includes(n.id) ? { ...n, isRead: true } : n
           )
         );
@@ -104,13 +104,13 @@ export function NotificationBell({ onNewProductClick }: NotificationBellProps) {
   const formatTimeAgo = (date: Date) => {
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-    
+
     if (diffInMinutes < 1) return 'Baru saja';
     if (diffInMinutes < 60) return `${diffInMinutes} menit yang lalu`;
-    
+
     const diffInHours = Math.floor(diffInMinutes / 60);
     if (diffInHours < 24) return `${diffInHours} jam yang lalu`;
-    
+
     const diffInDays = Math.floor(diffInHours / 24);
     return `${diffInDays} hari yang lalu`;
   };
@@ -127,18 +127,17 @@ export function NotificationBell({ onNewProductClick }: NotificationBellProps) {
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
-          <Badge 
-            variant="destructive" 
+          <Badge
+            variant="danger"
             className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center text-xs p-0"
           >
             {unreadCount > 9 ? '9+' : unreadCount}
           </Badge>
         )}
         {/* Connection indicator - green dot when connected */}
-        <div 
-          className={`absolute -bottom-1 -right-1 w-2 h-2 rounded-full ${
-            isConnected ? 'bg-green-500' : 'bg-gray-400'
-          }`}
+        <div
+          className={`absolute -bottom-1 -right-1 w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-gray-400'
+            }`}
           title={isConnected ? 'Terhubung' : 'Terputus'}
         ></div>
       </Button>
@@ -198,9 +197,8 @@ export function NotificationBell({ onNewProductClick }: NotificationBellProps) {
                   {notifications.map((notification) => (
                     <div
                       key={notification.id}
-                      className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${
-                        !notification.isRead ? 'bg-blue-50/30' : ''
-                      }`}
+                      className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${!notification.isRead ? 'bg-blue-50/30' : ''
+                        }`}
                       onClick={() => handleNotificationClick(notification)}
                     >
                       <div className="flex items-start gap-3">

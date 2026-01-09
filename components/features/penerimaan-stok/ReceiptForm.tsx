@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { StockReceipt, StockReceiptItem } from '@/lib/types';
+import { useState, useEffect } from 'react';
+import { StockReceipt, StockReceiptItem, MaterialOrder } from '@/lib/types';
 import { getOrders } from '@/lib/services/orders';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
@@ -15,9 +15,14 @@ interface ReceiptFormProps {
 
 function ReceiptFormContent({ onClose, onSubmit }: Omit<ReceiptFormProps, 'isOpen'>) {
   // Get orders that can be received (Dikirim or Pending status)
-  const availableOrders = useMemo(() => {
-    const orders = getOrders();
-    return orders.filter((o) => o.status === 'Dikirim' || o.status === 'Pending');
+  const [availableOrders, setAvailableOrders] = useState<MaterialOrder[]>([]);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      const orders = await getOrders();
+      setAvailableOrders(orders.filter((o) => o.status === 'Dikirim' || o.status === 'Pending'));
+    };
+    fetchOrders();
   }, []);
 
   const [selectedOrderId, setSelectedOrderId] = useState('');
@@ -99,9 +104,8 @@ function ReceiptFormContent({ onClose, onSubmit }: Omit<ReceiptFormProps, 'isOpe
           <select
             value={selectedOrderId}
             onChange={(e) => handleOrderChange(e.target.value)}
-            className={`w-full px-3 py-2 border rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent ${
-              errors.orderId ? 'border-red-500' : 'border-gray-300'
-            }`}
+            className={`w-full px-3 py-2 border rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent ${errors.orderId ? 'border-red-500' : 'border-gray-300'
+              }`}
           >
             <option value="">-- Pilih Pesanan --</option>
             {availableOrders.map((order) => (

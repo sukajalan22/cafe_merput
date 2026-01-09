@@ -51,10 +51,10 @@ function getTimeDiff(date: Date): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
-  
+
   if (diffMins < 1) return 'Baru saja';
   if (diffMins < 60) return `${diffMins} menit lalu`;
-  
+
   const diffHours = Math.floor(diffMins / 60);
   return `${diffHours} jam lalu`;
 }
@@ -69,9 +69,6 @@ export function OrderCard({ order, onStatusChange }: OrderCardProps) {
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <span className="text-lg font-bold text-gray-900">#{order.orderNumber}</span>
-            {order.customerName && (
-              <span className="text-sm text-gray-500">• {order.customerName}</span>
-            )}
           </div>
           <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${config.color}`}>
             <StatusIcon size={14} />

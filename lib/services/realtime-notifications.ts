@@ -1,5 +1,6 @@
 // Real-time notification service using Server-Sent Events
 import { query } from '@/lib/db/connection';
+import { RowDataPacket } from 'mysql2/promise';
 
 // Store active connections
 const connections = new Map<string, ReadableStreamDefaultController>();
@@ -34,9 +35,13 @@ export async function sendNotificationToRole(role: string, notification: any) {
       JOIN roles r ON u.role_id = r.role_id 
       WHERE r.nama_role = ? AND u.status = 'Aktif'
     `;
-    
-    const users = await query<{ user_id: string }[]>(usersSql, [role]);
-    
+
+    interface UserRow extends RowDataPacket {
+      user_id: string;
+    }
+
+    const users = await query<UserRow[]>(usersSql, [role]);
+
     // Send notification to each connected user
     users.forEach(user => {
       sendNotificationToUser(user.user_id, notification);
