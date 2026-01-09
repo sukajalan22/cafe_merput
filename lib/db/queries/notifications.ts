@@ -1,5 +1,4 @@
-import { query, execute } from '../connection';
-import { RowDataPacket } from 'mysql2/promise';
+import { query, execute, RowDataPacket } from '../connection';
 import { v4 as uuidv4 } from 'uuid';
 
 // Notification interface matching database schema

@@ -1,5 +1,4 @@
-import { query } from '../connection';
-import { RowDataPacket } from 'mysql2/promise';
+import { query, RowDataPacket } from '../connection';
 
 // Report summary interface
 export interface ReportSummary {
@@ -24,7 +23,7 @@ export interface CategorySalesData {
   total: number;
 }
 
-interface RevenueExpenseRow extends RowDataPacket, RevenueExpenseData {}
+interface RevenueExpenseRow extends RowDataPacket, RevenueExpenseData { }
 interface CategorySalesRow extends RowDataPacket {
   jenis_produk: string;
   total: number;
@@ -117,7 +116,7 @@ export async function getRevenueExpense(months: number = 6): Promise<RevenueExpe
     ORDER BY yearMonth ASC
   `;
   const revenueRows = await query<(RowDataPacket & { month: string; yearMonth: string; revenue: number })[]>(
-    revenueSql, 
+    revenueSql,
     [months]
   );
 
@@ -133,7 +132,7 @@ export async function getRevenueExpense(months: number = 6): Promise<RevenueExpe
     ORDER BY yearMonth ASC
   `;
   const expenseRows = await query<(RowDataPacket & { month: string; yearMonth: string; expense: number })[]>(
-    expenseSql, 
+    expenseSql,
     [months]
   );
 
@@ -252,7 +251,7 @@ export async function getDailyRevenueExpense(days: number = 7): Promise<DailyRev
     ORDER BY dateKey ASC
   `;
   const revenueRows = await query<(RowDataPacket & { label: string; dateKey: string; revenue: number })[]>(
-    revenueSql, 
+    revenueSql,
     [days]
   );
 
@@ -268,7 +267,7 @@ export async function getDailyRevenueExpense(days: number = 7): Promise<DailyRev
     ORDER BY dateKey ASC
   `;
   const expenseRows = await query<(RowDataPacket & { label: string; dateKey: string; expense: number })[]>(
-    expenseSql, 
+    expenseSql,
     [days]
   );
 
@@ -328,7 +327,7 @@ export async function getWeeklyRevenueExpense(weeks: number = 4): Promise<Weekly
     ORDER BY weekKey ASC
   `;
   const revenueRows = await query<(RowDataPacket & { label: string; weekKey: number; revenue: number })[]>(
-    revenueSql, 
+    revenueSql,
     [weeks, weeks]
   );
 
@@ -344,7 +343,7 @@ export async function getWeeklyRevenueExpense(weeks: number = 4): Promise<Weekly
     ORDER BY weekKey ASC
   `;
   const expenseRows = await query<(RowDataPacket & { label: string; weekKey: number; expense: number })[]>(
-    expenseSql, 
+    expenseSql,
     [weeks, weeks]
   );
 

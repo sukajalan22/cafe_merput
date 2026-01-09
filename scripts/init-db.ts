@@ -1,31 +1,34 @@
 /**
- * Database Initialization Script
+ * Database Initialization Script for PostgreSQL
  * This script creates all the necessary tables for the Cafe Merah Putih application
  */
 
-import { getPool } from '../lib/db/connection';
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+import { getPool, getConnection, closePool } from '../lib/db/connection';
 import * as fs from 'fs';
 import * as path from 'path';
 
 async function initializeDatabase() {
-  console.log('\n🔧 Cafe Merah Putih - Database Initialization\n');
-  
+  console.log('\n🔧 Cafe Merah Putih - Database Initialization (PostgreSQL)\n');
+
   const pool = getPool();
-  let connection;
+  let client;
 
   try {
     // Get a connection from the pool
-    connection = await pool.getConnection();
-    console.log('✓ Connected to database');
+    client = await getConnection();
+    console.log('✓ Connected to PostgreSQL database');
 
-    // Read the schema.sql file
-    const schemaPath = path.join(__dirname, '..', 'lib', 'db', 'schema.sql');
+    // Read the PostgreSQL schema file
+    const schemaPath = path.join(__dirname, '..', 'lib', 'db', 'schema-postgres.sql');
     const schema = fs.readFileSync(schemaPath, 'utf8');
 
     // Remove comments and split into statements
     const lines = schema.split('\n');
     let cleanedSQL = '';
-    
+
     for (const line of lines) {
       const trimmedLine = line.trim();
       // Skip comment-only lines
@@ -54,8 +57,8 @@ async function initializeDatabase() {
       const statement = statements[i];
 
       try {
-        await connection.query(statement);
-        
+        await client.query(statement);
+
         // Log progress for important operations
         if (statement.toUpperCase().includes('CREATE TABLE')) {
           const match = statement.match(/CREATE TABLE\s+(\w+)/i);
@@ -74,26 +77,41 @@ async function initializeDatabase() {
           if (match) {
             console.log(`  ✓ Created index: ${match[1]}`);
           }
+        } else if (statement.toUpperCase().includes('CREATE TYPE')) {
+          const match = statement.match(/CREATE TYPE\s+(\w+)/i);
+          if (match) {
+            console.log(`  ✓ Created type: ${match[1]}`);
+          }
+        } else if (statement.toUpperCase().includes('CREATE TRIGGER')) {
+          const match = statement.match(/CREATE TRIGGER\s+(\w+)/i);
+          if (match) {
+            console.log(`  ✓ Created trigger: ${match[1]}`);
+          }
         }
       } catch (error: any) {
-        console.error(`  ✗ Error executing statement: ${error.message}`);
-        console.error(`  Statement: ${statement.substring(0, 100)}...`);
-        throw error;
+        // Ignore "type already exists" errors
+        if (error.message.includes('already exists')) {
+          console.log(`  ⚠ Skipped (already exists): ${error.message.substring(0, 50)}...`);
+        } else {
+          console.error(`  ✗ Error executing statement: ${error.message}`);
+          console.error(`  Statement: ${statement.substring(0, 100)}...`);
+          throw error;
+        }
       }
     }
 
     console.log('\n✅ Database initialized successfully!\n');
-    console.log('You can now run: npx tsx scripts/test-queries.ts\n');
+    console.log('You can now run: npm run dev\n');
 
   } catch (error: any) {
     console.error('\n❌ Database initialization failed:');
     console.error(error.message);
     process.exit(1);
   } finally {
-    if (connection) {
-      connection.release();
+    if (client) {
+      client.release();
     }
-    await pool.end();
+    await closePool();
     console.log('Database connection closed');
   }
 }

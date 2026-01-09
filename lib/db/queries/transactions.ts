@@ -1,5 +1,4 @@
-import { query, transaction } from '../connection';
-import { RowDataPacket, PoolConnection } from 'mysql2/promise';
+import { query, transaction, RowDataPacket, PoolClient } from '../connection';
 import { v4 as uuidv4 } from 'uuid';
 
 // Transaction interface matching database schema
@@ -33,14 +32,14 @@ export interface TransactionWithItems extends Transaction {
   username: string;
 }
 
-interface TransactionRow extends RowDataPacket, Transaction {}
-interface TransactionItemRow extends RowDataPacket, TransactionItemWithProduct {}
+interface TransactionRow extends RowDataPacket, Transaction { }
+interface TransactionItemRow extends RowDataPacket, TransactionItemWithProduct { }
 
 // Transaction with username for list queries
 interface TransactionWithUser extends Transaction {
   username: string;
 }
-interface TransactionWithUserRow extends RowDataPacket, TransactionWithUser {}
+interface TransactionWithUserRow extends RowDataPacket, TransactionWithUser { }
 
 // DTOs
 export interface CreateTransactionItemDTO {
@@ -78,7 +77,7 @@ export async function getAll(startDate?: Date, endDate?: Date): Promise<Transact
   sql += ' ORDER BY t.tanggal DESC';
 
   const rows = await query<TransactionWithUserRow[]>(sql, params);
-  
+
   // Get items for each transaction
   const transactionsWithItems: TransactionWithItems[] = await Promise.all(
     rows.map(async (t) => {
@@ -92,7 +91,7 @@ export async function getAll(startDate?: Date, endDate?: Date): Promise<Transact
       return { ...t, items };
     })
   );
-  
+
   return transactionsWithItems;
 }
 
@@ -107,7 +106,7 @@ export async function getById(id: string): Promise<TransactionWithItems | null> 
     WHERE t.transaksi_id = ?
   `;
   const transactions = await query<TransactionWithUserRow[]>(transactionSql, [id]);
-  
+
   if (transactions.length === 0) {
     return null;
   }
@@ -131,19 +130,20 @@ export async function getById(id: string): Promise<TransactionWithItems | null> 
  * Also deducts material stock based on product compositions
  */
 export async function create(data: CreateTransactionDTO): Promise<TransactionWithItems> {
-  return transaction(async (conn: PoolConnection) => {
+  return transaction(async (conn: PoolClient) => {
     const transactionId = uuidv4();
-    
+
     // Calculate total from items
     let totalHarga = 0;
     const itemsWithPrices: { produk_id: string; jumlah: number; harga: number; nama_produk: string }[] = [];
 
     for (const item of data.items) {
-      const [products] = await conn.execute<(RowDataPacket & { harga: number; nama_produk: string })[]>(
-        'SELECT harga, nama_produk FROM products WHERE produk_id = ?',
+      const productsResult = await conn.query(
+        'SELECT harga, nama_produk FROM products WHERE produk_id = $1',
         [item.produk_id]
       );
-      
+      const products = productsResult.rows;
+
       if (products.length === 0) {
         throw new Error(`Product not found: ${item.produk_id}`);
       }
@@ -155,8 +155,8 @@ export async function create(data: CreateTransactionDTO): Promise<TransactionWit
     }
 
     // Insert transaction
-    await conn.execute(
-      'INSERT INTO transactions (transaksi_id, user_id, total_harga) VALUES (?, ?, ?)',
+    await conn.query(
+      'INSERT INTO transactions (transaksi_id, user_id, total_harga) VALUES ($1, $2, $3)',
       [transactionId, data.user_id, totalHarga]
     );
 
@@ -164,11 +164,11 @@ export async function create(data: CreateTransactionDTO): Promise<TransactionWit
     const items: TransactionItemWithProduct[] = [];
     for (const item of itemsWithPrices) {
       const detailId = uuidv4();
-      await conn.execute(
-        'INSERT INTO transaction_items (detail_id, transaksi_id, produk_id, jumlah, harga_satuan) VALUES (?, ?, ?, ?, ?)',
+      await conn.query(
+        'INSERT INTO transaction_items (detail_id, transaksi_id, produk_id, jumlah, harga_satuan) VALUES ($1, $2, $3, $4, $5)',
         [detailId, transactionId, item.produk_id, item.jumlah, item.harga]
       );
-      
+
       items.push({
         detail_id: detailId,
         transaksi_id: transactionId,
@@ -181,29 +181,31 @@ export async function create(data: CreateTransactionDTO): Promise<TransactionWit
       });
 
       // Deduct material stock based on product composition
-      const [productMaterials] = await conn.execute<(RowDataPacket & { bahan_id: string; jumlah: number })[]>(
-        'SELECT bahan_id, jumlah FROM product_materials WHERE produk_id = ?',
+      const pmResult = await conn.query(
+        'SELECT bahan_id, jumlah FROM product_materials WHERE produk_id = $1',
         [item.produk_id]
       );
+      const productMaterials = pmResult.rows;
 
       for (const pm of productMaterials) {
         // Calculate total material needed (composition amount * quantity ordered)
         const materialNeeded = pm.jumlah * item.jumlah;
-        
+
         // Deduct from material stock
-        await conn.execute(
-          'UPDATE materials SET stok_saat_ini = stok_saat_ini - ? WHERE bahan_id = ?',
+        await conn.query(
+          'UPDATE materials SET stok_saat_ini = stok_saat_ini - $1 WHERE bahan_id = $2',
           [materialNeeded, pm.bahan_id]
         );
       }
     }
 
     // Get user info for the response
-    const [users] = await conn.execute<(RowDataPacket & { username: string })[]>(
-      'SELECT username FROM users WHERE user_id = ?',
+    const usersResult = await conn.query(
+      'SELECT username FROM users WHERE user_id = $1',
       [data.user_id]
     );
-    
+    const users = usersResult.rows;
+
     const username = users.length > 0 ? users[0].username : '';
 
     // Return the created transaction with items

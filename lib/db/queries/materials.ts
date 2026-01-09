@@ -1,5 +1,4 @@
-import { query, execute } from '../connection';
-import { RowDataPacket } from 'mysql2/promise';
+import { query, execute, RowDataPacket } from '../connection';
 import { v4 as uuidv4 } from 'uuid';
 
 // Material interface matching database schema
@@ -18,7 +17,7 @@ export interface MaterialWithStatus extends Material {
   status: 'Aman' | 'Stok Rendah';
 }
 
-interface MaterialRow extends RowDataPacket, Material {}
+interface MaterialRow extends RowDataPacket, Material { }
 
 // DTOs
 export interface CreateMaterialDTO {

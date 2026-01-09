@@ -1,5 +1,4 @@
-import { query, execute } from '../connection';
-import { RowDataPacket } from 'mysql2/promise';
+import { query, execute, RowDataPacket } from '../connection';
 import { v4 as uuidv4 } from 'uuid';
 
 // User interface matching database schema
@@ -24,9 +23,9 @@ export interface UserWithRole extends User {
   nama_role: string;
 }
 
-interface UserRow extends RowDataPacket, User {}
-interface UserWithPasswordRow extends RowDataPacket, UserWithPassword {}
-interface UserWithRoleRow extends RowDataPacket, UserWithRole {}
+interface UserRow extends RowDataPacket, User { }
+interface UserWithPasswordRow extends RowDataPacket, UserWithPassword { }
+interface UserWithRoleRow extends RowDataPacket, UserWithRole { }
 
 // DTOs
 export interface CreateUserDTO {
@@ -64,7 +63,7 @@ export async function getAll(search?: string): Promise<UserWithRole[]> {
   }
 
   sql += ' ORDER BY u.username ASC';
-  
+
   const rows = await query<UserWithRoleRow[]>(sql, params);
   return rows;
 }

@@ -1,5 +1,4 @@
-import { query, execute } from '../connection';
-import { RowDataPacket } from 'mysql2/promise';
+import { query, execute, RowDataPacket } from '../connection';
 
 // ProductMaterial interface matching database schema
 export interface ProductMaterial {
@@ -21,9 +20,9 @@ export interface ProductMaterialWithProduct extends ProductMaterial {
   jenis_produk: string;
 }
 
-interface ProductMaterialRow extends RowDataPacket, ProductMaterial {}
-interface ProductMaterialWithDetailsRow extends RowDataPacket, ProductMaterialWithDetails {}
-interface ProductMaterialWithProductRow extends RowDataPacket, ProductMaterialWithProduct {}
+interface ProductMaterialRow extends RowDataPacket, ProductMaterial { }
+interface ProductMaterialWithDetailsRow extends RowDataPacket, ProductMaterialWithDetails { }
+interface ProductMaterialWithProductRow extends RowDataPacket, ProductMaterialWithProduct { }
 
 // DTOs
 export interface CreateProductMaterialDTO {

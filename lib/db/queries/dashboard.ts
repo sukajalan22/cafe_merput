@@ -1,5 +1,4 @@
-import { query } from '../connection';
-import { RowDataPacket } from 'mysql2/promise';
+import { query, RowDataPacket } from '../connection';
 
 // Dashboard statistics interface
 export interface DashboardStats {
@@ -31,8 +30,8 @@ interface StatsRow extends RowDataPacket {
   productsSold: number;
 }
 
-interface WeeklySalesRow extends RowDataPacket, WeeklySalesData {}
-interface TopProductRow extends RowDataPacket, TopProduct {}
+interface WeeklySalesRow extends RowDataPacket, WeeklySalesData { }
+interface TopProductRow extends RowDataPacket, TopProduct { }
 
 /**
  * Get dashboard statistics
@@ -93,24 +92,24 @@ export async function getWeeklySales(): Promise<WeeklySalesData[]> {
     ORDER BY DATE(tanggal) ASC
   `;
   const rows = await query<WeeklySalesRow[]>(sql);
-  
+
   // Ensure we have all 7 days
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const today = new Date();
   const result: WeeklySalesData[] = [];
-  
+
   for (let i = 6; i >= 0; i--) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     const dayName = days[date.getDay()];
-    
+
     const existingData = rows.find(r => r.day === dayName);
     result.push({
       day: dayName,
       sales: existingData ? existingData.sales : 0
     });
   }
-  
+
   return result;
 }
 

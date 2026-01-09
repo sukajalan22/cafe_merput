@@ -1,5 +1,4 @@
-import { query, execute } from '../connection';
-import { RowDataPacket } from 'mysql2/promise';
+import { query, execute, RowDataPacket } from '../connection';
 import { v4 as uuidv4 } from 'uuid';
 
 // Role interface matching database schema
@@ -10,7 +9,7 @@ export interface Role {
   updated_at: Date;
 }
 
-interface RoleRow extends RowDataPacket, Role {}
+interface RoleRow extends RowDataPacket, Role { }
 
 // DTOs
 export interface CreateRoleDTO {
@@ -55,7 +54,7 @@ export async function create(data: CreateRoleDTO): Promise<Role> {
   const id = uuidv4();
   const sql = 'INSERT INTO roles (role_id, nama_role) VALUES (?, ?)';
   await execute(sql, [id, data.nama_role]);
-  
+
   const role = await getById(id);
   if (!role) {
     throw new Error('Failed to create role');

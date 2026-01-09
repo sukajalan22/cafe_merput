@@ -1,5 +1,4 @@
-import { query, execute } from '../connection';
-import { RowDataPacket } from 'mysql2/promise';
+import { query, execute, RowDataPacket } from '../connection';
 import { v4 as uuidv4 } from 'uuid';
 
 // Product interface matching database schema
@@ -25,8 +24,8 @@ export interface ProductWithMaterials extends Product {
   materials: ProductMaterial[];
 }
 
-interface ProductRow extends RowDataPacket, Product {}
-interface ProductMaterialRow extends RowDataPacket, ProductMaterial {}
+interface ProductRow extends RowDataPacket, Product { }
+interface ProductMaterialRow extends RowDataPacket, ProductMaterial { }
 
 // DTOs
 export interface CreateProductDTO {
@@ -187,20 +186,20 @@ export async function checkProductAvailability(productId: string): Promise<boole
     JOIN materials m ON pm.bahan_id = m.bahan_id
     WHERE pm.produk_id = ?
   `;
-  
+
   interface MaterialStockRow extends RowDataPacket {
     bahan_id: string;
     required_qty: number;
     current_stock: number;
   }
-  
+
   const rows = await query<MaterialStockRow[]>(sql, [productId]);
-  
+
   // If no materials defined, product is available
   if (rows.length === 0) {
     return true;
   }
-  
+
   // Check if all materials have sufficient stock
   return rows.every(row => row.current_stock >= row.required_qty);
 }
@@ -211,7 +210,7 @@ export async function checkProductAvailability(productId: string): Promise<boole
 export async function getAllWithAvailability(search?: string, jenisProduk?: string): Promise<(Product & { is_available: boolean })[]> {
   // First get all products
   const products = await getAll(search, jenisProduk);
-  
+
   // Check availability for each product
   const productsWithAvailability = await Promise.all(
     products.map(async (product) => {
@@ -222,6 +221,6 @@ export async function getAllWithAvailability(search?: string, jenisProduk?: stri
       };
     })
   );
-  
+
   return productsWithAvailability;
 }

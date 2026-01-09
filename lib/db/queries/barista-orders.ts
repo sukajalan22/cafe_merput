@@ -1,5 +1,4 @@
-import { query, execute } from '../connection';
-import { RowDataPacket } from 'mysql2/promise';
+import { query, execute, RowDataPacket } from '../connection';
 import { v4 as uuidv4 } from 'uuid';
 
 // Barista Order Status
@@ -30,8 +29,8 @@ export interface BaristaOrderWithItems extends BaristaOrder {
   items: BaristaOrderItem[];
 }
 
-interface BaristaOrderRow extends RowDataPacket, BaristaOrder {}
-interface BaristaOrderItemRow extends RowDataPacket, BaristaOrderItem {}
+interface BaristaOrderRow extends RowDataPacket, BaristaOrder { }
+interface BaristaOrderItemRow extends RowDataPacket, BaristaOrderItem { }
 
 // DTOs
 export interface CreateBaristaOrderDTO {
@@ -75,7 +74,7 @@ export async function getAll(status?: BaristaOrderStatus | 'active'): Promise<Ba
   sql += ' ORDER BY bo.created_at DESC';
 
   const orders = await query<BaristaOrderRow[]>(sql, params);
-  
+
   // Get items for each order
   const ordersWithItems: BaristaOrderWithItems[] = await Promise.all(
     orders.map(async (order) => {
@@ -111,7 +110,7 @@ export async function getById(id: string): Promise<BaristaOrderWithItems | null>
     WHERE bo.order_id = ?
   `;
   const rows = await query<BaristaOrderRow[]>(sql, [id]);
-  
+
   if (rows.length === 0) {
     return null;
   }
@@ -183,12 +182,12 @@ export async function reduceMaterialStock(orderId: string): Promise<void> {
       FROM product_materials pm
       WHERE pm.produk_id = ?
     `;
-    
+
     interface MaterialRow extends RowDataPacket {
       bahan_id: string;
       jumlah: number;
     }
-    
+
     const materials = await query<MaterialRow[]>(materialsSql, [item.produk_id]);
 
     // Reduce stock for each material

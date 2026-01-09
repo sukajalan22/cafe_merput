@@ -1,18 +1,5 @@
-import mysql, { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
-
-// Database configuration from environment variables
-const dbConfig = {
-  host: process.env.DATABASE_HOST || 'localhost',
-  port: parseInt(process.env.DATABASE_PORT || '3306', 10),
-  user: process.env.DATABASE_USER || 'root',
-  password: process.env.DATABASE_PASSWORD || '',
-  database: process.env.DATABASE_NAME || 'cafe_merah_putih',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 0,
-};
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
+export type { PoolClient } from 'pg';
 
 // Create connection pool (singleton pattern)
 let pool: Pool | null = null;
@@ -22,8 +9,27 @@ let pool: Pool | null = null;
  */
 export function getPool(): Pool {
   if (!pool) {
-    pool = mysql.createPool(dbConfig);
-    console.log('MySQL connection pool created');
+    // Read DATABASE_URL at runtime (after dotenv.config() has been called)
+    const connectionString = process.env.DATABASE_URL;
+
+    if (!connectionString) {
+      throw new Error('DATABASE_URL environment variable is not set');
+    }
+
+    console.log('Connecting to:', connectionString.substring(0, 50) + '...');
+
+    const dbConfig = {
+      connectionString,
+      ssl: {
+        rejectUnauthorized: false
+      },
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    };
+
+    pool = new Pool(dbConfig);
+    console.log('PostgreSQL connection pool created');
   }
   return pool;
 }
@@ -31,21 +37,26 @@ export function getPool(): Pool {
 /**
  * Get a connection from the pool
  */
-export async function getConnection(): Promise<PoolConnection> {
+export async function getConnection(): Promise<PoolClient> {
   const pool = getPool();
   try {
-    const connection = await pool.getConnection();
-    return connection;
+    const client = await pool.connect();
+    return client;
   } catch (error) {
     console.error('Failed to get database connection:', error);
     throw new Error('Database connection failed. Please check your database configuration.');
   }
 }
 
+// RowDataPacket compatible type for backward compatibility with existing queries
+export interface RowDataPacket {
+  constructor: { name: 'RowDataPacket' };
+  [column: string]: unknown;
+}
 
 /**
  * Execute a SELECT query with prepared statements
- * @param sql - SQL query string with placeholders (?)
+ * @param sql - SQL query string with placeholders ($1, $2, etc)
  * @param params - Array of parameters to bind
  * @returns Array of rows
  */
@@ -55,17 +66,32 @@ export async function query<T extends RowDataPacket[]>(
 ): Promise<T> {
   const pool = getPool();
   try {
-    const [rows] = await pool.execute<T>(sql, params);
-    return rows;
+    // Convert MySQL-style ? placeholders to PostgreSQL $1, $2 style
+    let paramIndex = 0;
+    const pgSql = sql.replace(/\?/g, () => `$${++paramIndex}`);
+
+    const result: QueryResult<QueryResultRow> = await pool.query(pgSql, params);
+    // Add RowDataPacket compatibility
+    return result.rows.map(row => ({
+      ...row,
+      constructor: { name: 'RowDataPacket' as const }
+    })) as T;
   } catch (error) {
     console.error('Query execution failed:', error);
     throw error;
   }
 }
 
+// ResultSetHeader compatible type for backward compatibility
+export interface ResultSetHeader {
+  affectedRows: number;
+  insertId: number;
+  warningStatus: number;
+}
+
 /**
  * Execute an INSERT, UPDATE, or DELETE query with prepared statements
- * @param sql - SQL query string with placeholders (?)
+ * @param sql - SQL query string with placeholders ($1, $2, etc)
  * @param params - Array of parameters to bind
  * @returns ResultSetHeader with affectedRows, insertId, etc.
  */
@@ -75,8 +101,16 @@ export async function execute(
 ): Promise<ResultSetHeader> {
   const pool = getPool();
   try {
-    const [result] = await pool.execute<ResultSetHeader>(sql, params);
-    return result;
+    // Convert MySQL-style ? placeholders to PostgreSQL $1, $2 style
+    let paramIndex = 0;
+    const pgSql = sql.replace(/\?/g, () => `$${++paramIndex}`);
+
+    const result: QueryResult = await pool.query(pgSql, params);
+    return {
+      affectedRows: result.rowCount || 0,
+      insertId: 0, // PostgreSQL doesn't have auto-increment insertId in the same way
+      warningStatus: 0,
+    };
   } catch (error) {
     console.error('Execute failed:', error);
     throw error;
@@ -89,20 +123,20 @@ export async function execute(
  * @returns Result of the callback function
  */
 export async function transaction<T>(
-  callback: (connection: PoolConnection) => Promise<T>
+  callback: (client: PoolClient) => Promise<T>
 ): Promise<T> {
-  const connection = await getConnection();
+  const client = await getConnection();
   try {
-    await connection.beginTransaction();
-    const result = await callback(connection);
-    await connection.commit();
+    await client.query('BEGIN');
+    const result = await callback(client);
+    await client.query('COMMIT');
     return result;
   } catch (error) {
-    await connection.rollback();
+    await client.query('ROLLBACK');
     console.error('Transaction failed, rolled back:', error);
     throw error;
   } finally {
-    connection.release();
+    client.release();
   }
 }
 
@@ -113,9 +147,9 @@ export async function transaction<T>(
  */
 export async function testConnection(): Promise<boolean> {
   const pool = getPool();
-  const connection = await pool.getConnection();
-  await connection.ping();
-  connection.release();
+  const client = await pool.connect();
+  await client.query('SELECT 1');
+  client.release();
   console.log('Database connection test successful');
   return true;
 }
@@ -127,6 +161,6 @@ export async function closePool(): Promise<void> {
   if (pool) {
     await pool.end();
     pool = null;
-    console.log('MySQL connection pool closed');
+    console.log('PostgreSQL connection pool closed');
   }
 }

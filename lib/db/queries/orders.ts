@@ -1,5 +1,4 @@
-import { query, execute, transaction } from '../connection';
-import { RowDataPacket, PoolConnection } from 'mysql2/promise';
+import { query, execute, transaction, RowDataPacket, PoolClient } from '../connection';
 import { v4 as uuidv4 } from 'uuid';
 
 // MaterialOrder interface matching database schema
@@ -23,8 +22,8 @@ export interface MaterialOrderWithDetails extends MaterialOrder {
   username: string;
 }
 
-interface MaterialOrderRow extends RowDataPacket, MaterialOrder {}
-interface MaterialOrderWithDetailsRow extends RowDataPacket, MaterialOrderWithDetails {}
+interface MaterialOrderRow extends RowDataPacket, MaterialOrder { }
+interface MaterialOrderWithDetailsRow extends RowDataPacket, MaterialOrderWithDetails { }
 
 // DTOs
 export interface CreateMaterialOrderDTO {
@@ -115,34 +114,35 @@ export async function updateStatus(id: string, data: UpdateOrderStatusDTO): Prom
 
   // If status is changing to 'Diterima', update stock in a transaction
   if (data.status === 'Diterima' && existing.status !== 'Diterima') {
-    return transaction(async (conn: PoolConnection) => {
+    return transaction(async (conn: PoolClient) => {
       const tanggalTerima = data.tanggal_terima || new Date();
-      
+
       // Update order status
-      await conn.execute(
-        'UPDATE material_orders SET status = ?, tanggal_terima = ? WHERE pengadaan_id = ?',
+      await conn.query(
+        'UPDATE material_orders SET status = $1, tanggal_terima = $2 WHERE pengadaan_id = $3',
         [data.status, tanggalTerima, id]
       );
 
       // Update material stock
-      await conn.execute(
-        'UPDATE materials SET stok_saat_ini = stok_saat_ini + ? WHERE bahan_id = ?',
+      await conn.query(
+        'UPDATE materials SET stok_saat_ini = stok_saat_ini + $1 WHERE bahan_id = $2',
         [existing.jumlah, existing.bahan_id]
       );
 
       // Return updated order with details (query within transaction)
-      const [rows] = await conn.execute<MaterialOrderWithDetailsRow[]>(`
+      const result = await conn.query(`
         SELECT mo.*, m.nama_bahan, m.satuan, u.username
         FROM material_orders mo
         JOIN materials m ON mo.bahan_id = m.bahan_id
         JOIN users u ON mo.user_id = u.user_id
-        WHERE mo.pengadaan_id = ?
+        WHERE mo.pengadaan_id = $1
       `, [id]);
-      
+      const rows = result.rows;
+
       if (rows.length === 0) {
         throw new Error('Failed to update material order');
       }
-      return rows[0];
+      return rows[0] as MaterialOrderWithDetails;
     });
   }
 

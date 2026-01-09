@@ -5,10 +5,12 @@
  * Run with: npx tsx lib/db/seed.ts
  */
 
+import * as dotenv from 'dotenv';
+dotenv.config();
+
 import { v4 as uuidv4 } from 'uuid';
-import { getPool, execute, query, closePool } from './connection';
+import { getPool, execute, query, closePool, RowDataPacket } from './connection';
 import { hashPassword } from '../utils/password';
-import { RowDataPacket } from 'mysql2/promise';
 
 // ==================== Seed Data ====================
 
@@ -163,7 +165,7 @@ interface UserRow extends RowDataPacket {
 
 async function clearTables(): Promise<void> {
   console.log('Clearing existing data...');
-  
+
   // Delete in reverse order of dependencies
   await execute('DELETE FROM transaction_items');
   await execute('DELETE FROM transactions');
@@ -173,14 +175,14 @@ async function clearTables(): Promise<void> {
   await execute('DELETE FROM products');
   await execute('DELETE FROM users');
   await execute('DELETE FROM roles');
-  
+
   console.log('All tables cleared.');
 }
 
 async function seedRoles(): Promise<Map<string, string>> {
   console.log('Seeding roles...');
   const roleMap = new Map<string, string>();
-  
+
   for (const role of roles) {
     const roleId = uuidv4();
     await execute(
@@ -189,7 +191,7 @@ async function seedRoles(): Promise<Map<string, string>> {
     );
     roleMap.set(role.nama_role, roleId);
   }
-  
+
   console.log(`Inserted ${roles.length} roles.`);
   return roleMap;
 }
@@ -197,26 +199,26 @@ async function seedRoles(): Promise<Map<string, string>> {
 async function seedUsers(roleMap: Map<string, string>): Promise<Map<string, string>> {
   console.log('Seeding users...');
   const userMap = new Map<string, string>();
-  
+
   for (const user of users) {
     const userId = uuidv4();
     const roleId = roleMap.get(user.role);
-    
+
     if (!roleId) {
       console.error(`Role not found: ${user.role}`);
       continue;
     }
-    
+
     const hashedPassword = await hashPassword(user.password);
-    
+
     await execute(
       'INSERT INTO users (user_id, username, password, email, phone, role_id, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [userId, user.username, hashedPassword, user.email, user.phone || null, roleId, user.status]
     );
-    
+
     userMap.set(user.email, userId);
   }
-  
+
   console.log(`Inserted ${users.length} users.`);
   return userMap;
 }
@@ -225,7 +227,7 @@ async function seedUsers(roleMap: Map<string, string>): Promise<Map<string, stri
 async function seedProducts(): Promise<Map<string, string>> {
   console.log('Seeding products...');
   const productMap = new Map<string, string>();
-  
+
   for (const product of products) {
     const productId = uuidv4();
     await execute(
@@ -234,7 +236,7 @@ async function seedProducts(): Promise<Map<string, string>> {
     );
     productMap.set(product.nama_produk, productId);
   }
-  
+
   console.log(`Inserted ${products.length} products.`);
   return productMap;
 }
@@ -242,7 +244,7 @@ async function seedProducts(): Promise<Map<string, string>> {
 async function seedMaterials(): Promise<Map<string, string>> {
   console.log('Seeding materials...');
   const materialMap = new Map<string, string>();
-  
+
   for (const material of materials) {
     const materialId = uuidv4();
     await execute(
@@ -251,7 +253,7 @@ async function seedMaterials(): Promise<Map<string, string>> {
     );
     materialMap.set(material.nama_bahan, materialId);
   }
-  
+
   console.log(`Inserted ${materials.length} materials.`);
   return materialMap;
 }
@@ -261,24 +263,24 @@ async function seedProductMaterials(
   materialMap: Map<string, string>
 ): Promise<void> {
   console.log('Seeding product-material relationships...');
-  
+
   let count = 0;
   for (const pm of productMaterials) {
     const productId = productMap.get(pm.product);
     const materialId = materialMap.get(pm.material);
-    
+
     if (!productId || !materialId) {
       console.error(`Product or material not found: ${pm.product} - ${pm.material}`);
       continue;
     }
-    
+
     await execute(
       'INSERT INTO product_materials (produk_id, bahan_id, jumlah) VALUES (?, ?, ?)',
       [productId, materialId, pm.jumlah]
     );
     count++;
   }
-  
+
   console.log(`Inserted ${count} product-material relationships.`);
 }
 
@@ -287,13 +289,13 @@ async function seedSampleTransactions(
   productMap: Map<string, string>
 ): Promise<void> {
   console.log('Seeding sample transactions (6 months history)...');
-  
+
   const kasirId = userMap.get('kasir@cafemerahputih.com');
   if (!kasirId) {
     console.error('Kasir user not found, skipping transactions.');
     return;
   }
-  
+
   // Get product prices
   const productPrices = new Map<string, number>();
   for (const p of products) {
@@ -301,102 +303,102 @@ async function seedSampleTransactions(
   }
 
   const productNames = products.map(p => p.nama_produk);
-  
+
   // Generate transactions for the past 6 months
   let transactionCount = 0;
   const today = new Date();
-  
+
   for (let monthsAgo = 5; monthsAgo >= 0; monthsAgo--) {
     // Generate 20-40 transactions per month (more recent months have more)
     const txPerMonth = 20 + (5 - monthsAgo) * 5 + Math.floor(Math.random() * 10);
-    
+
     for (let i = 0; i < txPerMonth; i++) {
       const transactionId = uuidv4();
-      
+
       // Random date within the month
       const txDate = new Date(today);
       txDate.setMonth(txDate.getMonth() - monthsAgo);
       txDate.setDate(Math.floor(Math.random() * 28) + 1);
       txDate.setHours(Math.floor(Math.random() * 12) + 8);
-      
+
       // Random items (1-4 items per transaction)
       const numItems = Math.floor(Math.random() * 4) + 1;
       const items: { product: string; jumlah: number }[] = [];
       const usedProducts = new Set<string>();
-      
+
       for (let j = 0; j < numItems; j++) {
         let product: string;
         do {
           product = productNames[Math.floor(Math.random() * productNames.length)];
         } while (usedProducts.has(product));
         usedProducts.add(product);
-        
+
         items.push({
           product,
           jumlah: Math.floor(Math.random() * 3) + 1,
         });
       }
-      
+
       // Calculate total
       let totalHarga = 0;
       for (const item of items) {
         const price = productPrices.get(item.product) || 0;
         totalHarga += price * item.jumlah;
       }
-      
+
       // Insert transaction
       await execute(
         'INSERT INTO transactions (transaksi_id, user_id, tanggal, total_harga) VALUES (?, ?, ?, ?)',
         [transactionId, kasirId, txDate, totalHarga]
       );
-      
+
       // Insert transaction items
       for (const item of items) {
         const productId = productMap.get(item.product);
         const price = productPrices.get(item.product) || 0;
-        
+
         if (!productId) continue;
-        
+
         const detailId = uuidv4();
         await execute(
           'INSERT INTO transaction_items (detail_id, transaksi_id, produk_id, jumlah, harga_satuan) VALUES (?, ?, ?, ?, ?)',
           [detailId, transactionId, productId, item.jumlah, price]
         );
       }
-      
+
       transactionCount++;
     }
   }
-  
+
   // Add some transactions for today
   const todayTransactions = [
     { items: [{ product: 'Cappuccino', jumlah: 2 }, { product: 'Croissant', jumlah: 1 }] },
     { items: [{ product: 'Latte', jumlah: 1 }, { product: 'Cheesecake', jumlah: 1 }] },
     { items: [{ product: 'Americano', jumlah: 3 }, { product: 'Sandwich', jumlah: 2 }] },
   ];
-  
+
   for (const tx of todayTransactions) {
     const transactionId = uuidv4();
     let totalHarga = 0;
-    
+
     for (const item of tx.items) {
       const price = productPrices.get(item.product) || 0;
       totalHarga += price * item.jumlah;
     }
-    
+
     const txDate = new Date();
     txDate.setHours(Math.floor(Math.random() * 8) + 8);
-    
+
     await execute(
       'INSERT INTO transactions (transaksi_id, user_id, tanggal, total_harga) VALUES (?, ?, ?, ?)',
       [transactionId, kasirId, txDate, totalHarga]
     );
-    
+
     for (const item of tx.items) {
       const productId = productMap.get(item.product);
       const price = productPrices.get(item.product) || 0;
       if (!productId) continue;
-      
+
       const detailId = uuidv4();
       await execute(
         'INSERT INTO transaction_items (detail_id, transaksi_id, produk_id, jumlah, harga_satuan) VALUES (?, ?, ?, ?, ?)',
@@ -405,7 +407,7 @@ async function seedSampleTransactions(
     }
     transactionCount++;
   }
-  
+
   console.log(`Inserted ${transactionCount} sample transactions.`);
 }
 
@@ -415,15 +417,15 @@ async function seedSampleMaterialOrders(
   materialMap: Map<string, string>
 ): Promise<void> {
   console.log('Seeding sample material orders (6 months history)...');
-  
+
   const managerId = userMap.get('manajer@cafemerahputih.com');
   const pengadaanId = userMap.get('pengadaan@cafemerahputih.com');
-  
+
   if (!managerId || !pengadaanId) {
     console.error('Manager or Pengadaan user not found, skipping material orders.');
     return;
   }
-  
+
   const materialNames = materials.map(m => m.nama_bahan);
   const materialPrices: Record<string, number> = {
     'Biji Kopi Arabica': 150000,
@@ -442,33 +444,33 @@ async function seedSampleMaterialOrders(
     'Cream Cheese': 180000,
     'Roti Tawar': 15000,
   };
-  
+
   let orderCount = 0;
   const today = new Date();
-  
+
   // Generate orders for the past 6 months
   for (let monthsAgo = 5; monthsAgo >= 0; monthsAgo--) {
     // 3-6 orders per month
     const ordersPerMonth = Math.floor(Math.random() * 4) + 3;
-    
+
     for (let i = 0; i < ordersPerMonth; i++) {
       const orderId = uuidv4();
       const material = materialNames[Math.floor(Math.random() * materialNames.length)];
       const materialId = materialMap.get(material);
-      
+
       if (!materialId) continue;
-      
+
       const orderDate = new Date(today);
       orderDate.setMonth(orderDate.getMonth() - monthsAgo);
       orderDate.setDate(Math.floor(Math.random() * 28) + 1);
-      
+
       const jumlah = Math.floor(Math.random() * 20) + 5;
       const harga = (materialPrices[material] || 50000) * jumlah;
-      
+
       // Older orders are more likely to be received
       let status: 'Pending' | 'Dikirim' | 'Diterima';
       let receiveDate: Date | null = null;
-      
+
       if (monthsAgo >= 1) {
         status = 'Diterima';
         receiveDate = new Date(orderDate);
@@ -482,43 +484,43 @@ async function seedSampleMaterialOrders(
       } else {
         status = 'Pending';
       }
-      
+
       const userId = Math.random() > 0.5 ? managerId : pengadaanId;
-      
+
       await execute(
         'INSERT INTO material_orders (pengadaan_id, bahan_id, user_id, jumlah, harga, tanggal_pesan, tanggal_terima, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [orderId, materialId, userId, jumlah, harga, orderDate, receiveDate, status]
       );
-      
+
       orderCount++;
     }
   }
-  
+
   // Add some recent pending orders
   const recentOrders = [
     { material: 'Biji Kopi Arabica', jumlah: 20, status: 'Dikirim' as const, daysAgo: 3 },
     { material: 'Susu Full Cream', jumlah: 50, status: 'Pending' as const, daysAgo: 1 },
     { material: 'Matcha Powder', jumlah: 5, status: 'Pending' as const, daysAgo: 0 },
   ];
-  
+
   for (const order of recentOrders) {
     const materialId = materialMap.get(order.material);
     if (!materialId) continue;
-    
+
     const orderId = uuidv4();
     const orderDate = new Date();
     orderDate.setDate(orderDate.getDate() - order.daysAgo);
-    
+
     const harga = (materialPrices[order.material] || 50000) * order.jumlah;
-    
+
     await execute(
       'INSERT INTO material_orders (pengadaan_id, bahan_id, user_id, jumlah, harga, tanggal_pesan, tanggal_terima, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [orderId, materialId, pengadaanId, order.jumlah, harga, orderDate, null, order.status]
     );
-    
+
     orderCount++;
   }
-  
+
   console.log(`Inserted ${orderCount} sample material orders.`);
 }
 
@@ -528,31 +530,31 @@ async function seed(): Promise<void> {
   console.log('========================================');
   console.log('Starting database seed...');
   console.log('========================================\n');
-  
+
   try {
     // Initialize pool
     getPool();
-    
+
     // Clear existing data
     await clearTables();
-    
+
     // Seed data in order of dependencies
     const roleMap = await seedRoles();
     const userMap = await seedUsers(roleMap);
     const productMap = await seedProducts();
     const materialMap = await seedMaterials();
-    
+
     // Seed relationships
     await seedProductMaterials(productMap, materialMap);
-    
+
     // Seed sample data
     await seedSampleTransactions(userMap, productMap);
     await seedSampleMaterialOrders(userMap, materialMap);
-    
+
     console.log('\n========================================');
     console.log('Database seed completed successfully!');
     console.log('========================================');
-    
+
     console.log('\nDefault users created:');
     console.log('  - admin@cafemerahputih.com / admin123 (Admin)');
     console.log('  - manajer@cafemerahputih.com / manajer123 (Manager)');
@@ -560,7 +562,7 @@ async function seed(): Promise<void> {
     console.log('  - barista@cafemerahputih.com / barista123 (Barista)');
     console.log('  - pengadaan@cafemerahputih.com / pengadaan123 (Pengadaan)');
     console.log('  - pengadaan@cafemerahputih.com / pengadaan123 (Pengadaan)');
-    
+
   } catch (error) {
     console.error('\n========================================');
     console.error('Database seed failed!');
